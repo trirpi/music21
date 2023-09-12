@@ -795,6 +795,13 @@ class Segment:
                 return False
         return True
 
+    def _getConsecutivePossibilityWeight(self, possibA, possibB):
+        total_weight = 0
+        for (method, isCorrect, args) in self._consecutivePossibilityRuleChecking[True]:
+            if not (method(possibA, possibB, *args) == isCorrect):
+                total_weight += 1
+        return total_weight
+
     def _resolveOrdinarySegment(self, segmentB):
         '''
         An ordinary segment is defined as a segment which needs no special resolution, where the
