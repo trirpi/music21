@@ -687,32 +687,6 @@ class Realization:
 
         return progression
 
-    def getOptimalPossibilityProgression(self):
-        '''
-        Returns possibility progressions for this figured bass.
-        This is not necessarily unique.
-        '''
-        # TODO: Do this with weights and dp algorithm
-        progression = []
-        if len(self._segmentList) == 1:
-            possibA = random.sample(self._segmentList[0].correctA, 1)[0]
-            progression.append(possibA)
-            return progression
-
-        currMovements = self._segmentList[0].movements
-        if self.getNumSolutions() == 0:
-            raise FiguredBassLineException('Zero solutions')
-        prevPossib = currMovements.keys()[0]
-        progression.append(prevPossib)
-
-        for segmentIndex in range(len(self._segmentList) - 1):
-            currMovements = self._segmentList[segmentIndex].movements
-            nextPossib = currMovements[prevPossib][0]
-            progression.append(nextPossib)
-            prevPossib = nextPossib
-
-        return progression
-
     def generateRealizationFromPossibilityProgression(self, possibilityProgression):
         '''
         Generates a realization as a :class:`~music21.stream.Score` given a possibility progression.
@@ -814,13 +788,6 @@ class Realization:
         Generates a random unique realization as a :class:`~music21.stream.Score`.
         '''
         possibilityProgression = self.getRandomPossibilityProgression()
-        return self.generateRealizationFromPossibilityProgression(possibilityProgression)
-
-    def generateOptimalRealization(self):
-        '''
-        Generates an optimal realization as a :class:`~music21.stream.Score`.
-        '''
-        possibilityProgression = self.getOptimalPossibilityProgression()
         return self.generateRealizationFromPossibilityProgression(possibilityProgression)
 
     def generateRandomRealizations(self, amountToGenerate=20):
