@@ -821,6 +821,10 @@ class Segment:
         correctA = self.allCorrectSinglePossibilities()
         correctB = segmentB.allCorrectSinglePossibilities()
         correctAB = itertools.product(correctA, correctB)
+        return map(lambda possibAB: (
+            possibAB, self._getConsecutivePossibilityWeight(possibA=possibAB[0], possibB=possibAB[1])),
+                   correctAB
+                   )
         return filter(lambda possibAB: self._isCorrectConsecutivePossibility(possibA=possibAB[0],
                                                                              possibB=possibAB[1]),
                       correctAB)

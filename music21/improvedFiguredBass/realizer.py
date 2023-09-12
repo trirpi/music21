@@ -499,9 +499,9 @@ class FiguredBassLine:
                 correctAB = segmentA.allCorrectConsecutivePossibilities(segmentB)
                 segmentA.movements = collections.defaultdict(list)
                 listAB = list(correctAB)
-                for (possibA, possibB) in listAB:
-                    segmentA.movements[possibA].append(possibB)
-            self._trimAllMovements(segmentList)
+                for (possibA, possibB), weight in listAB:
+                    segmentA.movements[possibA].append((possibB, weight))
+        #            self._trimAllMovements(segmentList)
         elif len(segmentList) == 1:
             segmentA = segmentList[0]
             segmentA.correctA = list(segmentA.allCorrectSinglePossibilities())
@@ -687,6 +687,30 @@ class Realization:
 
         return progression
 
+    def getOptimalPossibilityProgression(self):
+        '''
+        Returns a random unique possibility progression.
+        '''
+        progression = []
+        if len(self._segmentList) == 1:
+            possibA = random.sample(self._segmentList[0].correctA, 1)[0]
+            progression.append(possibA)
+            return progression
+
+        currMovements = self._segmentList[0].movements
+        # if self.getNumSolutions() == 0:
+        #     raise FiguredBassLineException('Zero solutions')
+        prevPossib = random.sample(currMovements.keys(), 1)[0]
+        progression.append(prevPossib)
+
+        for segmentIndex in range(len(self._segmentList) - 1):
+            currMovements = self._segmentList[segmentIndex].movements
+            nextPossib, weight = random.sample(currMovements[prevPossib], 1)[0]
+            progression.append(nextPossib)
+            prevPossib = nextPossib
+
+        return progression
+
     def generateRealizationFromPossibilityProgression(self, possibilityProgression):
         '''
         Generates a realization as a :class:`~music21.stream.Score` given a possibility progression.
@@ -788,6 +812,10 @@ class Realization:
         Generates a random unique realization as a :class:`~music21.stream.Score`.
         '''
         possibilityProgression = self.getRandomPossibilityProgression()
+        return self.generateRealizationFromPossibilityProgression(possibilityProgression)
+
+    def generateOptimalRealization(self):
+        possibilityProgression = self.getOptimalPossibilityProgression()
         return self.generateRealizationFromPossibilityProgression(possibilityProgression)
 
     def generateRandomRealizations(self, amountToGenerate=20):
