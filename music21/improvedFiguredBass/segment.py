@@ -825,9 +825,6 @@ class Segment:
             possibAB, self._getConsecutivePossibilityWeight(possibA=possibAB[0], possibB=possibAB[1])),
                    correctAB
                    )
-        return filter(lambda possibAB: self._isCorrectConsecutivePossibility(possibA=possibAB[0],
-                                                                             possibB=possibAB[1]),
-                      correctAB)
 
     def _resolveSpecialSegment(self, segmentB, specialResolutionMethods):
         resolutionMethodExecutor = _compileRules(specialResolutionMethods, 3)

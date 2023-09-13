@@ -498,10 +498,13 @@ class FiguredBassLine:
                 segmentB = segmentList[segmentIndex + 1]
                 correctAB = segmentA.allCorrectConsecutivePossibilities(segmentB)
                 segmentA.movements = collections.defaultdict(list)
+                segmentB.costs = collections.defaultdict(lambda: collections.defaultdict(int))
                 listAB = list(correctAB)
                 for (possibA, possibB), weight in listAB:
-                    segmentA.movements[possibA].append((possibB, weight))
-        #            self._trimAllMovements(segmentList)
+                    segmentB.costs[possibA][possibB] = weight
+                for (possibA, possibB), _ in listAB:
+                    segmentA.movements[possibA].append(possibB)
+            self._trimAllMovements(segmentList)
         elif len(segmentList) == 1:
             segmentA = segmentList[0]
             segmentA.correctA = list(segmentA.allCorrectSinglePossibilities())
@@ -691,23 +694,86 @@ class Realization:
         '''
         Returns a random unique possibility progression.
         '''
+        # TODO
+        """
+dp = [
+    {option: (l(option), None) for option in options_sequence[0]}
+]
+
+
+for i, options in enumerate(options_sequence[1:]):
+    dp_entry = {}
+    end_of_phrase = (i == len(options_sequence)-2)
+    for option in options:
+        best_prev = None
+        best_cost = -10000000
+        for prev_option, (prev_cost, _) in dp[-1].items():
+            new_cost = prev_cost + l(option, end_of_phrase=end_of_phrase) + T(prev_option, option)
+            if new_cost >= best_cost:
+                best_prev = prev_option
+                best_cost = new_cost
+        dp_entry[option] = (best_cost, best_prev)
+    dp.append(dp_entry)
+
+column = len(dp)-1
+best_cost = -10000000
+best_option = None
+best_prev_option = None
+
+for option, (cost, prev_option) in dp[-1].items():
+    if cost > best_cost:
+        best_option = option
+        best_cost = cost
+        best_prev_option = prev_option
+
+solution = [best_option]
+
+for i in (range(len(dp)-2, -1, -1)):
+    solution.append(best_prev_option)
+    _, best_prev_option = dp[i][best_prev_option]
+solution = list(reversed(solution))
+        """
         progression = []
         if len(self._segmentList) == 1:
             possibA = random.sample(self._segmentList[0].correctA, 1)[0]
             progression.append(possibA)
             return progression
 
-        currMovements = self._segmentList[0].movements
-        # if self.getNumSolutions() == 0:
-        #     raise FiguredBassLineException('Zero solutions')
-        prevPossib = random.sample(currMovements.keys(), 1)[0]
-        progression.append(prevPossib)
+        dp = [  # Option, (cost, previous_option)
+            {possib: (0, None) for possib in self._segmentList[0].allCorrectSinglePossibilities()}
+        ]
 
-        for segmentIndex in range(len(self._segmentList) - 1):
-            currMovements = self._segmentList[segmentIndex].movements
-            nextPossib, weight = random.sample(currMovements[prevPossib], 1)[0]
-            progression.append(nextPossib)
-            prevPossib = nextPossib
+        for i, segment in enumerate(self._segmentList[1:]):
+            dp_entry = {}
+            for possib in segment.allCorrectSinglePossibilities():
+                best_prev = None
+                best_cost = float('inf')
+                for prev_possib, (prev_cost, _) in dp[-1].items():
+                    transition_cost = self._segmentList[i + 1].costs[prev_possib][possib]
+                    new_cost = prev_cost + transition_cost
+                    if new_cost < best_cost:
+                        best_prev = prev_possib
+                        best_cost = new_cost
+                dp_entry[possib] = (best_cost, best_prev)
+            dp.append(dp_entry)
+
+        # Extract best possib
+        best_cost = float('inf')
+        best_possib = None
+        best_prev_possib = None
+
+        for possib, (cost, prev_possib) in dp[-1].items():
+            if cost < best_cost:
+                best_possib = possib
+                best_cost = cost
+                best_prev_possib = prev_possib
+
+        reverse_progression = [best_possib]
+
+        for i in (range(len(dp) - 2, -1, -1)):
+            reverse_progression.append(best_prev_possib)
+            _, best_prev_possib = dp[i][best_prev_possib]
+        progression = list(reversed(reverse_progression))
 
         return progression
 
