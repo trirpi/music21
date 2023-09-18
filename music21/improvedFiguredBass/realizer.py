@@ -695,12 +695,6 @@ class Realization:
         '''
         Returns a random unique possibility progression.
         '''
-        progression = []
-        if len(self._segmentList) == 1:
-            possibA = random.sample(self._segmentList[0].correctA, 1)[0]
-            progression.append(possibA)
-            return progression
-
         dp = [  # Option, (cost, previous_option)
             {possib: (0, None) for possib in self._segmentList[0].allCorrectSinglePossibilities()}
         ]
@@ -720,9 +714,7 @@ class Realization:
             dp.append(dp_entry)
 
         # Extract best possib
-        best_cost = float('inf')
-        best_possib = None
-        best_prev_possib = None
+        best_cost, best_possib, best_prev_possib = float('inf'), None, None
 
         for possib, (cost, prev_possib) in dp[-1].items():
             if cost < best_cost:
@@ -730,16 +722,27 @@ class Realization:
                 best_cost = cost
                 best_prev_possib = prev_possib
 
-        logging.log(logging.INFO, f"Found solution with cost {best_cost}.")
-
         reverse_progression = [best_possib]
-
         for i in (range(len(dp) - 2, -1, -1)):
             reverse_progression.append(best_prev_possib)
-            _, best_prev_possib = dp[i][best_prev_possib]
-        progression = list(reversed(reverse_progression))
+            c, best_prev_possib = dp[i][best_prev_possib]
 
-        return progression
+        logging.log(logging.INFO, f"Found solution with cost {best_cost}.")
+
+        return list(reversed(reverse_progression))
+
+    def logPossibilityProgression(self, progression):
+        totalSumW = 0
+
+        def formatPossibility(pos):
+            return '(' + ' '.join(p.nameWithOctave.ljust(3) for p in pos) + ')'
+
+        for i, segment in enumerate(self._segmentList[:-1]):
+            weight = segment._getConsecutivePossibilityWeight(progression[i], progression[i + 1], enable_logging=True)
+            totalSumW += weight
+            logging.log(logging.INFO,
+                        f"Cost {formatPossibility(progression[i])} -> {formatPossibility(progression[i + 1])}: {weight}.")
+        logging.log(logging.INFO, totalSumW)
 
     def generateRealizationFromPossibilityProgression(self, possibilityProgression):
         '''
@@ -846,6 +849,7 @@ class Realization:
 
     def generateOptimalRealization(self):
         possibilityProgression = self.getOptimalPossibilityProgression()
+        self.logPossibilityProgression(possibilityProgression)
         return self.generateRealizationFromPossibilityProgression(possibilityProgression)
 
     def generateRandomRealizations(self, amountToGenerate=20):

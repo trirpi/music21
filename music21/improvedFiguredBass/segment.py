@@ -13,6 +13,7 @@ import collections
 import copy
 import functools
 import itertools
+import logging
 import unittest
 
 from music21 import chord
@@ -276,7 +277,7 @@ class Segment:
         discouragePartMovement = [
             (fbRules.discouragePartMovement, possibility.partMovementsWithinLimits, True,
              [[(1, maxSeparation), (2, maxSeparation), (3, maxSeparation)]])
-            for maxSeparation in range(1, 8)
+            for maxSeparation in range(2, 8)
         ]
         consecutivePossibRules = [
             (True, possibility.partsSame, True, [fbRules._partsToCheck]),
@@ -433,11 +434,12 @@ class Segment:
         resInversion = (resChord.inversion())
         resolveV43toI6 = domInversion and resInversion == 1
 
-        if (domChord.inversion() == 0
-            and resChord.root().name == tonic.name
-            and (resChord.isMajorTriad() or resChord.isMinorTriad())):
-            # "V7 to I" resolutions are always incomplete, with a missing fifth.
-            segmentB.fbRules.forbidIncompletePossibilities = False
+        forbidIncompletePossibilitiesOriginal = segmentB.fbRules.forbidIncompletePossibilities
+        # if (domChord.inversion() == 0
+        #     and resChord.root().name == tonic.name
+        #     and (resChord.isMajorTriad() or resChord.isMinorTriad())):
+        #     # "V7 to I" resolutions are always incomplete, with a missing fifth.
+        #     segmentB.fbRules.forbidIncompletePossibilities = False
 
         dominantResolutionMethods = [
             (resChord.root().name == tonic.name and resChord.isMajorTriad(),
@@ -471,6 +473,7 @@ class Segment:
         try:
             return self._resolveSpecialSegment(segmentB, dominantResolutionMethods)
         except SegmentException:
+            segmentB.fbRules.forbidIncompletePossibilities = forbidIncompletePossibilitiesOriginal
             self._environRules.warn(
                 'Dominant seventh resolution: No proper resolution available. '
                 + 'Executing ordinary resolution.')
@@ -803,10 +806,12 @@ class Segment:
                 return False
         return True
 
-    def _getConsecutivePossibilityWeight(self, possibA, possibB):
+    def _getConsecutivePossibilityWeight(self, possibA, possibB, enable_logging=False):
         total_weight = 0
         for (method, isCorrect, args) in self._consecutivePossibilityRuleChecking[True]:
             if not (method(possibA, possibB, *args) == isCorrect):
+                if enable_logging:
+                    logging.log(logging.INFO, method.__name__)
                 total_weight += 1
         return total_weight
 
@@ -835,6 +840,9 @@ class Segment:
                    )
 
     def _resolveSpecialSegment(self, segmentB, specialResolutionMethods):
+        self._consecutivePossibilityRuleChecking = _compileRules(
+            self.consecutivePossibilityRules(self.fbRules))
+
         resolutionMethodExecutor = _compileRules(specialResolutionMethods, 3)
         for (resolutionMethod, args) in resolutionMethodExecutor[True]:
             iterables = []
@@ -857,7 +865,10 @@ class Segment:
                 correctAB = filter(lambda possibAB: segmentB._isCorrectSinglePossibility(
                     possibA=possibAB[1]),
                                    correctAB)
-            return correctAB
+            return map(lambda possibAB: (
+                possibAB, self._getConsecutivePossibilityWeight(possibA=possibAB[0], possibB=possibAB[1])),
+                       correctAB
+                       )
 
         raise SegmentException('No standard resolution available.')
 
