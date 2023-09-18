@@ -499,7 +499,7 @@ class FiguredBassLine:
                 segmentB = segmentList[segmentIndex + 1]
                 correctAB = segmentA.allCorrectConsecutivePossibilities(segmentB)
                 segmentA.movements = collections.defaultdict(list)
-                segmentB.costs = collections.defaultdict(lambda: collections.defaultdict(int))
+                segmentB.costs = collections.defaultdict(dict)
                 listAB = list(correctAB)
                 for (possibA, possibB), weight in listAB:
                     segmentB.costs[possibA][possibB] = weight

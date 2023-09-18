@@ -434,7 +434,6 @@ class Segment:
         resInversion = (resChord.inversion())
         resolveV43toI6 = domInversion and resInversion == 1
 
-        forbidIncompletePossibilitiesOriginal = segmentB.fbRules.forbidIncompletePossibilities
         # if (domChord.inversion() == 0
         #     and resChord.root().name == tonic.name
         #     and (resChord.isMajorTriad() or resChord.isMinorTriad())):
@@ -473,7 +472,6 @@ class Segment:
         try:
             return self._resolveSpecialSegment(segmentB, dominantResolutionMethods)
         except SegmentException:
-            segmentB.fbRules.forbidIncompletePossibilities = forbidIncompletePossibilitiesOriginal
             self._environRules.warn(
                 'Dominant seventh resolution: No proper resolution available. '
                 + 'Executing ordinary resolution.')
@@ -775,8 +773,8 @@ class Segment:
             self.specialResolutionRules(self.fbRules),
             3
         )
-        for (resolutionMethod, args) in self._specialResolutionRuleChecking[True]:
-            return resolutionMethod(segmentB, *args)
+        # for (resolutionMethod, args) in self._specialResolutionRuleChecking[True]:
+        #     return resolutionMethod(segmentB, *args)
         return self._resolveOrdinarySegment(segmentB)
 
     # ------------------------------------------------------------------------------
@@ -809,7 +807,7 @@ class Segment:
     def _getConsecutivePossibilityWeight(self, possibA, possibB, enable_logging=False):
         total_weight = 0
         for (method, isCorrect, args) in self._consecutivePossibilityRuleChecking[True]:
-            if not (method(possibA, possibB, *args) == isCorrect):
+            if method(possibA, possibB, *args) != isCorrect:
                 if enable_logging:
                     logging.log(logging.INFO, method.__name__)
                 total_weight += 1
