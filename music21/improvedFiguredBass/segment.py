@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import collections
 import copy
+import functools
 import itertools
 import unittest
 
@@ -21,9 +22,9 @@ from music21 import note
 from music21 import pitch
 from music21 import scale
 from music21.figuredBass import realizerScale
-from music21.figuredBass import rules
 from music21.improvedFiguredBass import possibility
 from music21.improvedFiguredBass import resolution
+from music21.improvedFiguredBass import rules
 
 # used below
 _MOD = 'figuredBass.segment'
@@ -272,6 +273,11 @@ class Segment:
 
         isItalianAugmentedSixth = self.segmentChord.isItalianAugmentedSixth()
 
+        discouragePartMovement = [
+            (fbRules.discouragePartMovement, possibility.partMovementsWithinLimits, True,
+             [[(1, maxSeparation), (2, maxSeparation), (3, maxSeparation)]])
+            for maxSeparation in range(1, 8)
+        ]
         consecutivePossibRules = [
             (True, possibility.partsSame, True, [fbRules._partsToCheck]),
             (fbRules._upperPartsRemainSame, possibility.upperPartsSame, True),
@@ -284,7 +290,8 @@ class Segment:
             (fbRules.resolveAugmentedSixthProperly and isItalianAugmentedSixth,
              possibility.couldBeItalianA6Resolution,
              True,
-             [_unpackTriad(self.segmentChord), fbRules.restrictDoublingsInItalianA6Resolution])
+             [_unpackTriad(self.segmentChord), fbRules.restrictDoublingsInItalianA6Resolution]),
+            *discouragePartMovement
         ]
 
         return consecutivePossibRules
@@ -667,6 +674,7 @@ class Segment:
         iterables.append([pitch.Pitch(self.bassNote.pitch.nameWithOctave)])
         return itertools.product(*iterables)
 
+    @functools.cache
     def allCorrectSinglePossibilities(self):
         '''
         Uses :meth:`~music21.figuredBass.segment.Segment.allSinglePossibilities` and

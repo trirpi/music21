@@ -44,6 +44,7 @@ from __future__ import annotations
 
 import collections
 import copy
+import logging
 import random
 import typing as t
 import unittest
@@ -59,7 +60,7 @@ from music21 import stream
 from music21.figuredBass import checker
 from music21.figuredBass import notation
 from music21.figuredBass import realizerScale
-from music21.figuredBass import rules
+from music21.improvedFiguredBass import rules
 from music21.improvedFiguredBass import segment
 
 if t.TYPE_CHECKING:
@@ -694,45 +695,6 @@ class Realization:
         '''
         Returns a random unique possibility progression.
         '''
-        # TODO
-        """
-dp = [
-    {option: (l(option), None) for option in options_sequence[0]}
-]
-
-
-for i, options in enumerate(options_sequence[1:]):
-    dp_entry = {}
-    end_of_phrase = (i == len(options_sequence)-2)
-    for option in options:
-        best_prev = None
-        best_cost = -10000000
-        for prev_option, (prev_cost, _) in dp[-1].items():
-            new_cost = prev_cost + l(option, end_of_phrase=end_of_phrase) + T(prev_option, option)
-            if new_cost >= best_cost:
-                best_prev = prev_option
-                best_cost = new_cost
-        dp_entry[option] = (best_cost, best_prev)
-    dp.append(dp_entry)
-
-column = len(dp)-1
-best_cost = -10000000
-best_option = None
-best_prev_option = None
-
-for option, (cost, prev_option) in dp[-1].items():
-    if cost > best_cost:
-        best_option = option
-        best_cost = cost
-        best_prev_option = prev_option
-
-solution = [best_option]
-
-for i in (range(len(dp)-2, -1, -1)):
-    solution.append(best_prev_option)
-    _, best_prev_option = dp[i][best_prev_option]
-solution = list(reversed(solution))
-        """
         progression = []
         if len(self._segmentList) == 1:
             possibA = random.sample(self._segmentList[0].correctA, 1)[0]
@@ -767,6 +729,8 @@ solution = list(reversed(solution))
                 best_possib = possib
                 best_cost = cost
                 best_prev_possib = prev_possib
+
+        logging.log(logging.INFO, f"Found solution with cost {best_cost}.")
 
         reverse_progression = [best_possib]
 
