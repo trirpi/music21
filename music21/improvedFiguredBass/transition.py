@@ -24,7 +24,8 @@ class Transition:
     def get_cost(self, enable_logging=False):
         rule_set: RuleSet = self.segment_transition.rule_set
 
-        return rule_set.get_cost(self.possib_a, self.possib_b, {'segment_b': self.segment_b})
+        return rule_set.get_cost(self.possib_a, self.possib_b, {'segment_b': self.segment_b},
+                                 enable_logging=enable_logging)
 
     def __repr__(self):
         def format_possibility(pos):

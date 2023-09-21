@@ -1,4 +1,5 @@
 import itertools
+import logging
 from abc import abstractmethod, ABC
 from functools import cache
 
@@ -28,11 +29,14 @@ class RuleSet:
     def get_rules(self):
         return self.rules
 
-    def get_cost(self, possib_a, possib_b, context):
-        return sum([
-            rule.get_cost(possib_a, possib_b, context)
-            for rule in self.rules
-        ])
+    def get_cost(self, possib_a, possib_b, context, enable_logging=False):
+        total_cost = 0
+        for rule in self.rules:
+            cost = rule.get_cost(possib_a, possib_b, context)
+            if enable_logging and cost > 0:
+                logging.log(logging.INFO, f"Cost += {cost} due to {rule.__class__.__name__}")
+            total_cost += cost
+        return total_cost
 
 
 class Rule(ABC):
