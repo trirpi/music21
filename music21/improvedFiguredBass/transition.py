@@ -1,7 +1,8 @@
 import itertools
-import logging
 from collections import defaultdict
 from functools import cache
+
+from music21.improvedFiguredBass.rules import RuleSet
 
 
 class Transition:
@@ -9,29 +10,21 @@ class Transition:
         self.possib_a = possib_a
         self.possib_b = possib_b
 
-        self.segment_a = segment_transition.segment_a
-        self.segment_b = segment_transition.segment_b
+        self.segment_transition = segment_transition
+
+    @property
+    def segment_a(self):
+        return self.segment_transition.segment_a
+
+    @property
+    def segment_b(self):
+        return self.segment_transition.segment_b
 
     @cache
     def get_cost(self, enable_logging=False):
-        rulesList = self.segment_a.consecutivePossibilityRules(self.segment_a.fbRules)
-        rules = []
+        rule_set: RuleSet = self.segment_transition.rule_set
 
-        for rule in rulesList:
-            args = []
-            if len(rule) == 5:
-                args = rule[-1]
-            (should_run_method, method, is_correct, cost) = rule[:4]
-            if should_run_method:
-                rules.append((method, is_correct, cost, args))
-
-        total_cost = 0
-        for (method, isCorrect, cost, args) in rules:
-            if method(self.possib_a, self.possib_b, *args) != isCorrect:
-                if enable_logging:
-                    logging.log(logging.INFO, f"Cost += {cost} due to {method.__name__}")
-                total_cost += cost
-        return total_cost
+        return rule_set.get_cost(self.possib_a, self.possib_b, {'segment_b': self.segment_b})
 
     def __repr__(self):
         def format_possibility(pos):
@@ -41,9 +34,11 @@ class Transition:
 
 
 class SegmentTransition:
-    def __init__(self, segment_a, segment_b):
+    def __init__(self, segment_a, segment_b, rule_set: RuleSet):
         self.segment_a = segment_a
         self.segment_b = segment_b
+
+        self.rule_set = rule_set
 
         self.possibs_from = self.segment_a.allCorrectSinglePossibilities()
         self.possibs_to = self.segment_b.allCorrectSinglePossibilities()

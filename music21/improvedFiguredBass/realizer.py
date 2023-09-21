@@ -60,6 +60,8 @@ from music21.figuredBass import notation
 from music21.figuredBass import realizerScale
 from music21.improvedFiguredBass import rules_config
 from music21.improvedFiguredBass import segment
+from music21.improvedFiguredBass.rules import RuleSet
+from music21.improvedFiguredBass.rules_config import RulesConfig
 from music21.improvedFiguredBass.transition import SegmentTransition
 
 if t.TYPE_CHECKING:
@@ -582,8 +584,11 @@ class Realization:
             self._paddingLeft = fbLineOutputs['paddingLeft']
         self.keyboardStyleOutput = True
 
+        rule_set = RuleSet(RulesConfig())
+
         self._segment_transitions = [
-            SegmentTransition(self._segmentList[i], self._segmentList[i + 1]) for i in range(len(self._segmentList) - 1)
+            SegmentTransition(self._segmentList[i], self._segmentList[i + 1], rule_set)
+            for i in range(len(self._segmentList) - 1)
         ]
 
     def get_optimal_possibility_progression(self):

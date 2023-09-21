@@ -13,7 +13,6 @@ import collections
 import copy
 import functools
 import itertools
-import logging
 import unittest
 
 from music21 import chord
@@ -208,95 +207,6 @@ class Segment:
         ]
 
         return singlePossibRules
-
-    def consecutivePossibilityRules(self, fbRules=None):
-        # noinspection PyShadowingNames
-        '''
-        A framework for storing consecutive possibility rules and methods to be applied
-        in :meth:`~music21.figuredBass.segment.Segment.allCorrectConsecutivePossibilities`.
-        Takes in a :class:`~music21.figuredBass.rules.Rules` object, fbRules; if None
-        then a new rules.Rules() object is created.
-
-        Items are added within this method in the following form:
-
-            (willRunOnlyIfTrue, methodToRun, keepSolutionsWhichReturn, optionalArgs)
-
-        These items are compiled internally when
-        :meth:`~music21.figuredBass.segment.Segment.allCorrectConsecutivePossibilities`
-        is called on a Segment. Here, the compilation of rules and methods
-        bases on a default fbRules is shown.
-
-        >>> from music21.figuredBass import segment
-        >>> segmentA = segment.Segment()
-        >>> allConsecutiveRules = segmentA.consecutivePossibilityRules()
-
-        >>> segment.printRules(allConsecutiveRules)
-        Will run:  Method:                       Keep solutions which return:  Arguments:
-        True       partsSame                     True                          []
-        False      upperPartsSame                True                          None
-        True       voiceOverlap                  False                         None
-        True       partMovementsWithinLimits     True                          []
-        True       parallelFifths                False                         None
-        True       parallelOctaves               False                         None
-        True       hiddenFifth                   False                         None
-        True       hiddenOctave                  False                         None
-        False      couldBeItalianA6Resolution    True           [<music21.pitch.Pitch C3>,
-                                                                 <music21.pitch.Pitch C3>,
-                                                                 <music21.pitch.Pitch E3>,
-                                                                 <music21.pitch.Pitch G3>], True
-
-        Now, a modified fbRules is provided, allowing hidden octaves and
-        voice overlap, and limiting the soprano line to stepwise motion.
-
-        >>> from music21.figuredBass import rules
-        >>> fbRules = rules_config.RulesConfig()
-        >>> fbRules.forbidVoiceOverlap = False
-        >>> fbRules.forbidHiddenOctaves = False
-        >>> fbRules.partMovementLimits.append((1, 2))
-        >>> allConsecutiveRules = segmentA.consecutivePossibilityRules(fbRules)
-        >>> segment.printRules(allConsecutiveRules)
-        Will run:  Method:                       Keep solutions which return:  Arguments:
-        True       partsSame                     True                          []
-        False      upperPartsSame                True                          None
-        False      voiceOverlap                  False                         None
-        True       partMovementsWithinLimits     True                          [(1, 2)]
-        True       parallelFifths                False                         None
-        True       parallelOctaves               False                         None
-        True       hiddenFifth                   False                         None
-        False      hiddenOctave                  False                         None
-        False      couldBeItalianA6Resolution    True           [<music21.pitch.Pitch C3>,
-                                                                 <music21.pitch.Pitch C3>,
-                                                                 <music21.pitch.Pitch E3>,
-                                                                 <music21.pitch.Pitch G3>], True
-        '''
-        if fbRules is None:
-            fbRules = rules_config.RulesConfig()
-
-        isItalianAugmentedSixth = self.segmentChord.isItalianAugmentedSixth()
-
-        discouragePartMovement = [
-            (fbRules.discouragePartMovement, possibility.partMovementsWithinLimits, True, fbRules.lowPriorityRuleCost,
-             [[(1, maxSeparation), (2, maxSeparation), (3, maxSeparation)]])
-            for maxSeparation in range(2, 8)
-        ]
-        consecutivePossibRules = [
-            (True, possibility.partsSame, True, fbRules.lowPriorityRuleCost, [fbRules._partsToCheck]),
-            (fbRules._upperPartsRemainSame, possibility.upperPartsSame, True, fbRules.lowPriorityRuleCost),
-            (fbRules.forbidVoiceOverlap, possibility.voiceOverlap, False, fbRules.lowPriorityRuleCost),
-            (True, possibility.partMovementsWithinLimits, True, fbRules.lowPriorityRuleCost,
-             [fbRules.partMovementLimits]),
-            (fbRules.forbidParallelFifths, possibility.parallelFifths, False, fbRules.highPriorityRuleCost),
-            (fbRules.forbidParallelOctaves, possibility.parallelOctaves, False, fbRules.highPriorityRuleCost),
-            (fbRules.forbidHiddenFifths, possibility.hiddenFifth, False, fbRules.mediumPriorityRuleCost),
-            (fbRules.forbidHiddenOctaves, possibility.hiddenOctave, False, fbRules.mediumPriorityRuleCost),
-            (fbRules.resolveAugmentedSixthProperly and isItalianAugmentedSixth,
-             possibility.couldBeItalianA6Resolution,
-             True, fbRules.lowPriorityRuleCost,
-             [_unpackTriad(self.segmentChord), fbRules.restrictDoublingsInItalianA6Resolution]),
-            *discouragePartMovement
-        ]
-
-        return consecutivePossibRules
 
     def specialResolutionRules(self, fbRules=None):
         '''
@@ -713,71 +623,6 @@ class Segment:
         allA = self.allSinglePossibilities()
         return [possibA for possibA in allA if self._isCorrectSinglePossibility(possibA)]
 
-    def allCorrectConsecutivePossibilities(self, segmentB):
-        # noinspection PyShadowingNames
-        '''
-        Returns an iterator through correct (possibA, possibB) pairs.
-
-        * If segmentA (self) is a special Segment, meaning that one of the Segment
-          resolution methods in :meth:`~music21.figuredBass.segment.Segment.specialResolutionRules`
-          needs to be applied, then this method returns every correct possibility of segmentA
-          matched up with exactly one resolution possibility.
-
-        * If segmentA is an ordinary, non-special Segment, then this method returns every
-          combination of correct possibilities of segmentA and correct possibilities of segmentB
-          which passes all filters
-          in :meth:`~music21.figuredBass.segment.Segment.consecutivePossibilityRules`.
-
-        Two notes on segmentA being a special Segment:
-
-        1. By default, resolution possibilities are not filtered
-           using :meth:`~music21.figuredBass.segment.Segment.singlePossibilityRules`
-           rules of segmentB. Filter by setting
-           :attr:`~music21.figuredBass.rules.Rules.applySinglePossibRulesToResolution` to True.
-
-        2. By default, (possibA, possibB) pairs are not filtered
-           using :meth:`~music21.figuredBass.segment.Segment.consecutivePossibilityRules`
-           rules of segmentA. Filter by setting
-           :attr:`~music21.figuredBass.rules.Rules.applyConsecutivePossibRulesToResolution`
-           to True.
-
-        >>> from music21.figuredBass import segment
-        >>> segmentA = segment.Segment(bassNote=note.Note('C3'), notationString='')
-        >>> segmentB = segment.Segment(bassNote=note.Note('D3'), notationString='4,3')
-
-        Here, an ordinary resolution is being executed, because segmentA is an ordinary Segment.
-
-        >>> consecutivePairs1 = segmentA.allCorrectConsecutivePossibilities(segmentB)
-        >>> consecutivePairsList1 = list(consecutivePairs1)
-        >>> len(consecutivePairsList1)
-        31
-        >>> consecutivePairsList1[29]
-        ((<...G5>, <...G5>, <...E5>, <...C3>), (<...G5>, <...F5>, <...B4>, <...D3>))
-
-        Here, a special resolution is being executed, because segmentA below is a
-        special Segment.
-
-        >>> segmentA = segment.Segment(bassNote=note.Note('D3'), notationString='4,3')
-        >>> segmentB = segment.Segment(bassNote=note.Note('C3'), notationString='')
-        >>> consecutivePairs2 = segmentA.allCorrectConsecutivePossibilities(segmentB)
-        >>> consecutivePairsList2 = list(consecutivePairs2)
-        >>> len(consecutivePairsList2)
-        6
-        >>> consecutivePairsList2[5]
-        ((<...G5>, <...F5>, <...B4>, <...D3>), (<...G5>, <...E5>, <...C5>, <...C3>))
-        '''
-        if not (self.numParts == segmentB.numParts):
-            raise SegmentException('Two segments with unequal numParts cannot be compared.')
-        if not (self._maxPitch == segmentB._maxPitch):
-            raise SegmentException('Two segments with unequal maxPitch cannot be compared.')
-        self._specialResolutionRuleChecking = _compileRules(
-            self.specialResolutionRules(self.fbRules),
-            3
-        )
-        # for (resolutionMethod, args) in self._specialResolutionRuleChecking[True]:
-        #     return resolutionMethod(segmentB, *args)
-        return self._resolveOrdinarySegment(segmentB)
-
     # ------------------------------------------------------------------------------
     # INTERNAL METHODS
 
@@ -792,84 +637,6 @@ class Segment:
             if not (method(possibA, *args) == isCorrect):
                 return False
         return True
-
-    def _isCorrectConsecutivePossibility(self, possibA, possibB):
-        '''
-        Takes in a (possibA, possibB) pair from a segmentA (self) and segmentB,
-        and returns True if the pair is correct given
-        :meth:`~music21.figuredBass.segment.Segment.consecutivePossibilityRules`
-        from segmentA.
-        '''
-        for (method, isCorrect, cost, args) in self._consecutivePossibilityRuleChecking[True]:
-            if not (method(possibA, possibB, *args) == isCorrect):
-                return False
-        return True
-
-    def _getConsecutivePossibilityCost(self, possibA, possibB, enable_logging=False):
-        total_cost = 0
-        for (method, isCorrect, cost, args) in self._consecutivePossibilityRuleChecking[True]:
-            if method(possibA, possibB, *args) != isCorrect:
-                if enable_logging:
-                    logging.log(logging.INFO, f"Cost += {cost} due to {method.__name__}")
-                total_cost += cost
-        return total_cost
-
-    def _resolveOrdinarySegment(self, segmentB):
-        '''
-        An ordinary segment is defined as a segment which needs no special resolution, where the
-        segment does not spell out a special chord, for example, a dominant seventh.
-
-
-        Finds iterators through all possibA and possibB by calling
-        :meth:`~music21.figuredBass.segment.Segment.allCorrectSinglePossibilities`
-        on self (segmentA) and segmentB, respectively.
-        Returns an iterator through (possibA, possibB) pairs for which
-        :meth:`~music21.figuredBass.segment.Segment._isCorrectConsecutivePossibility` returns True.
-
-        >>> from music21.figuredBass import segment
-        '''
-        self._consecutivePossibilityRuleChecking = _compileRules(
-            self.consecutivePossibilityRules(self.fbRules))
-        correctA = self.allCorrectSinglePossibilities()
-        correctB = segmentB.allCorrectSinglePossibilities()
-        correctAB = itertools.product(correctA, correctB)
-        return map(lambda possibAB: (
-            possibAB, self._getConsecutivePossibilityCost(possibA=possibAB[0], possibB=possibAB[1])),
-                   correctAB
-                   )
-
-    def _resolveSpecialSegment(self, segmentB, specialResolutionMethods):
-        self._consecutivePossibilityRuleChecking = _compileRules(
-            self.consecutivePossibilityRules(self.fbRules))
-
-        resolutionMethodExecutor = _compileRules(specialResolutionMethods, 3)
-        for (resolutionMethod, args) in resolutionMethodExecutor[True]:
-            iterables = []
-            for arg in args:
-                iterables.append(itertools.repeat(arg))
-            resolutions = map(resolutionMethod, self.allCorrectSinglePossibilities(), *iterables)
-            correctAB = zip(self.allCorrectSinglePossibilities(), resolutions)
-            correctAB = filter(lambda possibAB: possibility.pitchesWithinLimit(
-                possibA=possibAB[1],
-                maxPitch=segmentB._maxPitch),
-                               correctAB)
-            if self.fbRules.applyConsecutivePossibRulesToResolution:
-                correctAB = filter(lambda possibAB: self._isCorrectConsecutivePossibility(
-                    possibA=possibAB[0],
-                    possibB=possibAB[1]),
-                                   correctAB)
-            if self.fbRules.applySinglePossibRulesToResolution:
-                segmentB._singlePossibilityRuleChecking = _compileRules(
-                    segmentB.singlePossibilityRules(segmentB.fbRules))
-                correctAB = filter(lambda possibAB: segmentB._isCorrectSinglePossibility(
-                    possibA=possibAB[1]),
-                                   correctAB)
-            return map(lambda possibAB: (
-                possibAB, self._getConsecutivePossibilityCost(possibA=possibAB[0], possibB=possibAB[1])),
-                       correctAB
-                       )
-
-        raise SegmentException('No standard resolution available.')
 
 
 class OverlaidSegment(Segment):

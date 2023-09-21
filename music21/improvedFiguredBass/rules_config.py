@@ -154,15 +154,6 @@ class RulesConfig(prebase.ProtoM21Object):
         self.upperPartsMaxSemitoneSeparation = 12
         self.forbidVoiceCrossing = True
 
-        # Consecutive Possibility rules
-        self.forbidParallelFifths = True
-        self.forbidParallelOctaves = True
-        self.forbidHiddenFifths = True
-        self.forbidHiddenOctaves = True
-        self.forbidVoiceOverlap = True
-        self.partMovementLimits = []
-        self.discouragePartMovement = True
-
         self.highPriorityRuleCost = 16
         self.mediumPriorityRuleCost = 8
         self.lowPriorityRuleCost = 4
