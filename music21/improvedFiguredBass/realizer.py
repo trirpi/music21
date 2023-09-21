@@ -42,10 +42,8 @@ See :meth:`~music21.figuredBass.realizer.figuredBassFromStream` for more details
 '''
 from __future__ import annotations
 
-import collections
 import copy
 import logging
-import random
 import typing as t
 import unittest
 
@@ -60,8 +58,9 @@ from music21 import stream
 from music21.figuredBass import checker
 from music21.figuredBass import notation
 from music21.figuredBass import realizerScale
-from music21.improvedFiguredBass import rules
+from music21.improvedFiguredBass import rules_config
 from music21.improvedFiguredBass import segment
+from music21.improvedFiguredBass.transition import SegmentTransition
 
 if t.TYPE_CHECKING:
     pass
@@ -82,7 +81,7 @@ def figuredBassFromStream(streamPart: stream.Stream) -> FiguredBassLine:
     >>> fb
     <music21.figuredBass.realizer.FiguredBassLine object at 0x...>
 
-    >>> fbRules = figuredBass.rules.Rules()
+    >>> fbRules = figuredBass.rules.RulesConfig()
     >>> fbRules.partMovementLimits = [(1, 2), (2, 12), (3, 12)]
     >>> fbRealization = fb.realize(fbRules)
     >>> fbRealization.getNumSolutions()
@@ -343,7 +342,7 @@ class FiguredBassLine:
         if maxPitch is None, uses pitch.Pitch('B5')
         '''
         if fbRules is None:
-            fbRules = rules.Rules()
+            fbRules = rules_config.RulesConfig()
         if maxPitch is None:
             maxPitch = pitch.Pitch('B5')
         segmentList = []
@@ -417,7 +416,7 @@ class FiguredBassLine:
         >>> fbLine.addElement(note.Note('B2'))
         >>> fbLine.addElement(note.Note('C#3'), '6')
         >>> fbLine.addElement(note.Note('D#3'), '6')
-        >>> fbRules = rules.Rules()
+        >>> fbRules = rules.RulesConfig()
         >>> r1 = fbLine.realize(fbRules)
         >>> r1.getNumSolutions()
         208
@@ -446,7 +445,7 @@ class FiguredBassLine:
 
         '''
         if fbRules is None:
-            fbRules = rules.Rules()
+            fbRules = rules_config.RulesConfig()
         if maxPitch is None:
             maxPitch = pitch.Pitch('B5')
 
@@ -497,15 +496,6 @@ class FiguredBassLine:
             for segmentIndex in range(len(segmentList) - 1):
                 segmentA = segmentList[segmentIndex]
                 segmentB = segmentList[segmentIndex + 1]
-                correctAB = segmentA.allCorrectConsecutivePossibilities(segmentB)
-                segmentA.movements = collections.defaultdict(list)
-                segmentB.costs = collections.defaultdict(dict)
-                listAB = list(correctAB)
-                for (possibA, possibB), weight in listAB:
-                    segmentB.costs[possibA][possibB] = weight
-                for (possibA, possibB), _ in listAB:
-                    segmentA.movements[possibA].append(possibB)
-            self._trimAllMovements(segmentList)
         elif len(segmentList) == 1:
             segmentA = segmentList[0]
             segmentA.correctA = list(segmentA.allCorrectSinglePossibilities())
@@ -592,120 +582,25 @@ class Realization:
             self._paddingLeft = fbLineOutputs['paddingLeft']
         self.keyboardStyleOutput = True
 
-    def getNumSolutions(self):
-        '''
-        Returns the number of solutions (unique realizations) to a Realization by calculating
-        the total number of paths through a string of :class:`~music21.figuredBass.segment.Segment`
-        movements. This is faster and more efficient than compiling each unique realization into a
-        list, adding it to a master list, and then taking the length of the master list.
-
-        >>> from music21.figuredBass import examples
-        >>> fbLine = examples.exampleB()
-        >>> fbRealization = fbLine.realize()
-        >>> fbRealization.getNumSolutions()
-        422
-        >>> fbLine2 = examples.exampleC()
-        >>> fbRealization2 = fbLine2.realize()
-        >>> fbRealization2.getNumSolutions()
-        833
-        '''
-        if len(self._segmentList) == 1:
-            return len(self._segmentList[0].correctA)
-        # What if there's only one (bassNote, notationString)?
-        self._segmentList.reverse()
-        pathList = {}
-        for segmentIndex in range(1, len(self._segmentList)):
-            segmentA = self._segmentList[segmentIndex]
-            newPathList = {}
-            if not pathList:
-                for possibA in segmentA.movements:
-                    newPathList[possibA] = len(segmentA.movements[possibA])
-            else:
-                for possibA in segmentA.movements:
-                    prevValue = 0
-                    for possibB in segmentA.movements[possibA]:
-                        prevValue += pathList[possibB]
-                    newPathList[possibA] = prevValue
-            pathList = newPathList
-
-        numSolutions = 0
-        for possibA in pathList:
-            numSolutions += pathList[possibA]
-        self._segmentList.reverse()
-        return numSolutions
-
-    def getAllPossibilityProgressions(self):
-        '''
-        Compiles each unique possibility progression, adding
-        it to a master list. Returns the master list.
-
-
-        .. warning:: This method is unoptimized, and may take a prohibitive amount
-            of time for a Realization which has more than 200,000 solutions.
-        '''
-        progressions = []
-        if len(self._segmentList) == 1:
-            for possibA in self._segmentList[0].correctA:
-                progressions.append([possibA])
-            return progressions
-
-        currMovements = self._segmentList[0].movements
-        for possibA in currMovements:
-            possibBList = currMovements[possibA]
-            for possibB in possibBList:
-                progressions.append([possibA, possibB])
-
-        for segmentIndex in range(1, len(self._segmentList) - 1):
-            currMovements = self._segmentList[segmentIndex].movements
-            for unused_progressionIndex in range(len(progressions)):
-                progression = progressions.pop(0)
-                possibB = progression[-1]
-                for possibC in currMovements[possibB]:
-                    newProgression = copy.copy(progression)
-                    newProgression.append(possibC)
-                    progressions.append(newProgression)
-
-        return progressions
-
-    def getRandomPossibilityProgression(self):
-        '''
-        Returns a random unique possibility progression.
-        '''
-        progression = []
-        if len(self._segmentList) == 1:
-            possibA = random.sample(self._segmentList[0].correctA, 1)[0]
-            progression.append(possibA)
-            return progression
-
-        currMovements = self._segmentList[0].movements
-        if self.getNumSolutions() == 0:
-            raise FiguredBassLineException('Zero solutions')
-        prevPossib = random.sample(currMovements.keys(), 1)[0]
-        progression.append(prevPossib)
-
-        for segmentIndex in range(len(self._segmentList) - 1):
-            currMovements = self._segmentList[segmentIndex].movements
-            nextPossib = random.sample(currMovements[prevPossib], 1)[0]
-            progression.append(nextPossib)
-            prevPossib = nextPossib
-
-        return progression
-
-    def getOptimalPossibilityProgression(self):
-        '''
-        Returns a random unique possibility progression.
-        '''
-        dp = [  # Option, (cost, previous_option)
-            {possib: (0, None) for possib in self._segmentList[0].allCorrectSinglePossibilities()}
+        self._segment_transitions = [
+            SegmentTransition(self._segmentList[i], self._segmentList[i + 1]) for i in range(len(self._segmentList) - 1)
         ]
 
-        for i, segment in enumerate(self._segmentList[1:]):
+    def get_optimal_possibility_progression(self):
+        """
+        Returns a random unique possibility progression.
+        """
+        dp = [  # Option, (cost, previous_option)
+            {possib: (0, None) for possib in self._segment_transitions[0].possibs_from}
+        ]
+
+        for i, segment_transition in enumerate(self._segment_transitions):
             dp_entry = {}
-            for possib in segment.allCorrectSinglePossibilities():
+            for possib in segment_transition.possibs_to:
                 best_prev = None
                 best_cost = float('inf')
                 for prev_possib, (prev_cost, _) in dp[-1].items():
-                    transition_cost = self._segmentList[i + 1].costs[prev_possib][possib]
+                    transition_cost = segment_transition.transitions_matrix[prev_possib][possib].get_cost()
                     new_cost = prev_cost + transition_cost
                     if new_cost < best_cost:
                         best_prev = prev_possib
@@ -732,17 +627,13 @@ class Realization:
         return list(reversed(reverse_progression))
 
     def logPossibilityProgression(self, progression):
-        totalSumW = 0
-
         def formatPossibility(pos):
             return '(' + ' '.join(p.nameWithOctave.ljust(3) for p in pos) + ')'
 
         for i, segment in enumerate(self._segmentList[:-1]):
-            weight = segment._getConsecutivePossibilityWeight(progression[i], progression[i + 1], enable_logging=True)
-            totalSumW += weight
+            weight = segment._getConsecutivePossibilityCost(progression[i], progression[i + 1], enable_logging=True)
             logging.log(logging.INFO,
                         f"Cost {formatPossibility(progression[i])} -> {formatPossibility(progression[i + 1])}: {weight}.")
-        logging.log(logging.INFO, totalSumW)
 
     def generateRealizationFromPossibilityProgression(self, possibilityProgression):
         '''
@@ -848,7 +739,7 @@ class Realization:
         return self.generateRealizationFromPossibilityProgression(possibilityProgression)
 
     def generateOptimalRealization(self):
-        possibilityProgression = self.getOptimalPossibilityProgression()
+        possibilityProgression = self.get_optimal_possibility_progression()
         self.logPossibilityProgression(possibilityProgression)
         return self.generateRealizationFromPossibilityProgression(possibilityProgression)
 

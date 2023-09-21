@@ -5,9 +5,11 @@ __all__ = [
     'harmony',
     'possibility',
     'rules',
+    'rules_config',
     'realizer',
     'resolution',
     'segment',
+    'transition',
 
     'FiguredBass',
 ]
@@ -17,5 +19,7 @@ from music21.improvedFiguredBass import possibility
 from music21.improvedFiguredBass import realizer
 from music21.improvedFiguredBass import resolution
 from music21.improvedFiguredBass import rules
+from music21.improvedFiguredBass import rules_config
 from music21.improvedFiguredBass import segment
+from music21.improvedFiguredBass import transition
 from music21.improvedFiguredBass.harmony import FiguredBass

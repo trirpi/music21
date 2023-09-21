@@ -68,6 +68,7 @@ The application of these methods is controlled by corresponding instance variabl
 '''
 from __future__ import annotations
 
+import itertools
 import unittest
 
 from music21 import chord
@@ -224,10 +225,7 @@ def pitchesWithinLimit(possibA, maxPitch=pitch.Pitch('B5')):
     True
     >>> resPossib = resolution.dominantSeventhToMajorTonic(domPossib)
     >>> resPossib  # Contains C6 > B5
-    (<music21.pitch.Pitch C6>,
-     <music21.pitch.Pitch E5>,
-     <music21.pitch.Pitch C4>,
-     <music21.pitch.Pitch C3>)
+    (<music21.pitch.Pitch C6>, <music21.pitch.Pitch E5>, <music21.pitch.Pitch C4>, <music21.pitch.Pitch C3>)
     >>> possibility.pitchesWithinLimit(resPossib)
     False
     '''
@@ -881,49 +879,83 @@ def couldBeItalianA6Resolution(possibA, possibB, threePartChordInfo=None, restri
             if i.directedName != 'm-2':
                 return False
 
-#     # Part 1: Check if possibA is A6 chord, and if it is properly formed.
-#     bass = possibA[-1]
-#     root = None
-#     rootIndex = 0
-#     for pitchA in possibA[0:-1]:
-#         if not (pitchA.ps - bass.ps) % 12 == 10:
-#             rootIndex += 1
-#             continue
-#         br = interval.Interval(bass, pitchA)
-#         isAugmentedSixth = (br.directedSimpleName == 'A6')
-#         if isAugmentedSixth:
-#             root = pitchA
-#             break
-#     tonic = bass.transpose('M3')
-#     # Restrict doublings, It+6
-#     for pitchIndex in range(len(possibA) - 1):
-#         if pitchIndex == rootIndex:
-#             continue
-#         pitchA = possibA[pitchIndex]
-#         if not pitchA.name == tonic.name:
-#             return False
-#
-#     # Part 2: If possibA is Italian A6 chord, check that it resolves properly in possibB.
-#     fifth = root.transpose('m2')
-#     pairsList = partPairs(possibA, possibB)
-#     (bassA, bassB) = pairsList[-1]
-#     (rootA, rootB) = pairsList[rootIndex]
-#     if not (bassB.name == fifth.name and rootB.name == fifth.name):
-#         return False
-#     if not (bassB.ps - bassA.ps == -1.0 and rootB.ps - rootA.ps == 1.0):
-#         return False
-#     allowedIntervalNames = ['M3', 'm3', 'M2', 'm-2']
-#     for pitchIndex in range(len(pairsList) - 1):
-#         if pitchIndex == rootIndex:
-#             continue
-#         (tonicA, tonicB) = pairsList[pitchIndex]
-#         if tonicA == tonicB:
-#             continue
-#         tt = interval.Interval(tonicA, tonicB)
-#         if not tt.directedSimpleName in allowedIntervalNames:
-#             return False
+    #     # Part 1: Check if possibA is A6 chord, and if it is properly formed.
+    #     bass = possibA[-1]
+    #     root = None
+    #     rootIndex = 0
+    #     for pitchA in possibA[0:-1]:
+    #         if not (pitchA.ps - bass.ps) % 12 == 10:
+    #             rootIndex += 1
+    #             continue
+    #         br = interval.Interval(bass, pitchA)
+    #         isAugmentedSixth = (br.directedSimpleName == 'A6')
+    #         if isAugmentedSixth:
+    #             root = pitchA
+    #             break
+    #     tonic = bass.transpose('M3')
+    #     # Restrict doublings, It+6
+    #     for pitchIndex in range(len(possibA) - 1):
+    #         if pitchIndex == rootIndex:
+    #             continue
+    #         pitchA = possibA[pitchIndex]
+    #         if not pitchA.name == tonic.name:
+    #             return False
+    #
+    #     # Part 2: If possibA is Italian A6 chord, check that it resolves properly in possibB.
+    #     fifth = root.transpose('m2')
+    #     pairsList = partPairs(possibA, possibB)
+    #     (bassA, bassB) = pairsList[-1]
+    #     (rootA, rootB) = pairsList[rootIndex]
+    #     if not (bassB.name == fifth.name and rootB.name == fifth.name):
+    #         return False
+    #     if not (bassB.ps - bassA.ps == -1.0 and rootB.ps - rootA.ps == 1.0):
+    #         return False
+    #     allowedIntervalNames = ['M3', 'm3', 'M2', 'm-2']
+    #     for pitchIndex in range(len(pairsList) - 1):
+    #         if pitchIndex == rootIndex:
+    #             continue
+    #         (tonicA, tonicB) = pairsList[pitchIndex]
+    #         if tonicA == tonicB:
+    #             continue
+    #         tt = interval.Interval(tonicA, tonicB)
+    #         if not tt.directedSimpleName in allowedIntervalNames:
+    #             return False
 
     return True
+
+
+def hasUnpreparedNote(possibA, possibB, segmentB):
+    '''
+
+    >>> from music21.improvedFiguredBass import segment
+    >>> C = pitch.Pitch("C3")
+    >>> E = pitch.Pitch("E3")
+    >>> F = pitch.Pitch("F3")
+    >>> G = pitch.Pitch("G3")
+    >>> A = pitch.Pitch("A3")
+    >>> B = pitch.Pitch("B3")
+    >>> Ch = pitch.Pitch("C4")
+    >>> Eh = pitch.Pitch("E4")
+    >>> Fh = pitch.Pitch("F4")
+    >>> possibAPrepared = (Eh, B, G, E)
+    >>> possibAUnprepared = (Fh, Ch, A, F)
+    >>> possibB = (B, G, E, C)
+    >>> segmentB = segment.Segment(notationString='7')
+    >>> hasUnpreparedNote(possibAUnprepared, possibB, segmentB)
+    True
+    >>> hasUnpreparedNote(possibAPrepared, possibB, segmentB)
+    False
+    '''
+    sevent = segmentB.segmentChord.seventh
+    if sevent is not None:
+        prepared = False
+        for n1, n2 in itertools.product(possibA, possibB):
+            if n1 == n2 and n2.pitchClass == sevent.pitchClass:
+                prepared = True
+                break
+        if not prepared: return True
+    return False
+
 
 # HELPER METHODS
 # --------------
@@ -945,18 +977,13 @@ def partPairs(possibA, possibB):
     >>> possibA1 = (C5, G4, E4, C4)
     >>> possibB1 = (B4, F4, D4, D4)
     >>> possibility.partPairs(possibA1, possibA1)
-    [(<music21.pitch.Pitch C5>, <music21.pitch.Pitch C5>),
-     (<music21.pitch.Pitch G4>, <music21.pitch.Pitch G4>),
-     (<music21.pitch.Pitch E4>, <music21.pitch.Pitch E4>),
-     (<music21.pitch.Pitch C4>, <music21.pitch.Pitch C4>)]
+    [(<music21.pitch.Pitch C5>, <music21.pitch.Pitch C5>), (<music21.pitch.Pitch G4>, <music21.pitch.Pitch G4>), (<music21.pitch.Pitch E4>, <music21.pitch.Pitch E4>), (<music21.pitch.Pitch C4>, <music21.pitch.Pitch C4>)]
     >>> possibility.partPairs(possibA1, possibB1)
-    [(<music21.pitch.Pitch C5>, <music21.pitch.Pitch B4>),
-     (<music21.pitch.Pitch G4>, <music21.pitch.Pitch F4>),
-     (<music21.pitch.Pitch E4>, <music21.pitch.Pitch D4>),
-     (<music21.pitch.Pitch C4>, <music21.pitch.Pitch D4>)]
+    [(<music21.pitch.Pitch C5>, <music21.pitch.Pitch B4>), (<music21.pitch.Pitch G4>, <music21.pitch.Pitch F4>), (<music21.pitch.Pitch E4>, <music21.pitch.Pitch D4>), (<music21.pitch.Pitch C4>, <music21.pitch.Pitch D4>)]
 
     '''
     return list(zip(possibA, possibB))
+
 
 # apply a function to one pitch of possibA at a time
 # apply a function to two pitches of possibA at a time
@@ -979,6 +1006,7 @@ _DOC_ORDER = [*singlePossibilityMethods, partPairs, *consequentPossibilityMethod
 class PossibilityException(exceptions21.Music21Exception):
     pass
 
+
 # ------------------------------------------------------------------------------
 
 
@@ -988,5 +1016,5 @@ class Test(unittest.TestCase):
 
 if __name__ == '__main__':
     import music21
-    music21.mainTest(Test)
 
+    music21.mainTest(Test)

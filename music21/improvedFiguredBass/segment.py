@@ -25,7 +25,7 @@ from music21 import scale
 from music21.figuredBass import realizerScale
 from music21.improvedFiguredBass import possibility
 from music21.improvedFiguredBass import resolution
-from music21.improvedFiguredBass import rules
+from music21.improvedFiguredBass import rules_config
 
 # used below
 _MOD = 'figuredBass.segment'
@@ -108,7 +108,7 @@ class Segment:
                  bassNote: str | note.Note = 'C3',
                  notationString: str | None = None,
                  fbScale: realizerScale.FiguredBassScale | None = None,
-                 fbRules: rules.Rules | None = None,
+                 fbRules: rules_config.RulesConfig | None = None,
                  numParts=4,
                  maxPitch: str | pitch.Pitch = 'B5',
                  listOfPitches=None):
@@ -124,7 +124,7 @@ class Segment:
         assert fbScale is not None  # tells mypy that we have it now
 
         if fbRules is None:
-            self.fbRules = rules.Rules()
+            self.fbRules = rules_config.RulesConfig()
         else:
             self.fbRules = copy.deepcopy(fbRules)
 
@@ -180,8 +180,8 @@ class Segment:
 
         Here, a modified fbRules is provided, which allows for incomplete possibilities.
 
-        >>> from music21.figuredBass import rules
-        >>> fbRules = rules.Rules()
+        >>> from music21.improvedFiguredBass import rules_config
+        >>> fbRules = rules_config.RulesConfig()
         >>> fbRules.forbidIncompletePossibilities = False
         >>> allSingleRules = segmentA.singlePossibilityRules(fbRules)
         >>> segment.printRules(allSingleRules)
@@ -191,20 +191,20 @@ class Segment:
         True       voiceCrossing                 False                         None
         '''
         if fbRules is None:
-            fbRules = rules.Rules()
+            fbRules = rules_config.RulesConfig()
 
         singlePossibRules = [
             (fbRules.forbidIncompletePossibilities,
              possibility.isIncomplete,
-             False,
+             False, fbRules.highPriorityRuleCost,
              [self.pitchNamesInChord]),
             (True,
              possibility.upperPartsWithinLimit,
-             True,
+             True, fbRules.highPriorityRuleCost,
              [fbRules.upperPartsMaxSemitoneSeparation]),
             (fbRules.forbidVoiceCrossing,
              possibility.voiceCrossing,
-             False)
+             False, fbRules.highPriorityRuleCost)
         ]
 
         return singlePossibRules
@@ -249,7 +249,7 @@ class Segment:
         voice overlap, and limiting the soprano line to stepwise motion.
 
         >>> from music21.figuredBass import rules
-        >>> fbRules = rules.Rules()
+        >>> fbRules = rules_config.RulesConfig()
         >>> fbRules.forbidVoiceOverlap = False
         >>> fbRules.forbidHiddenOctaves = False
         >>> fbRules.partMovementLimits.append((1, 2))
@@ -270,27 +270,28 @@ class Segment:
                                                                  <music21.pitch.Pitch G3>], True
         '''
         if fbRules is None:
-            fbRules = rules.Rules()
+            fbRules = rules_config.RulesConfig()
 
         isItalianAugmentedSixth = self.segmentChord.isItalianAugmentedSixth()
 
         discouragePartMovement = [
-            (fbRules.discouragePartMovement, possibility.partMovementsWithinLimits, True,
+            (fbRules.discouragePartMovement, possibility.partMovementsWithinLimits, True, fbRules.lowPriorityRuleCost,
              [[(1, maxSeparation), (2, maxSeparation), (3, maxSeparation)]])
             for maxSeparation in range(2, 8)
         ]
         consecutivePossibRules = [
-            (True, possibility.partsSame, True, [fbRules._partsToCheck]),
-            (fbRules._upperPartsRemainSame, possibility.upperPartsSame, True),
-            (fbRules.forbidVoiceOverlap, possibility.voiceOverlap, False),
-            (True, possibility.partMovementsWithinLimits, True, [fbRules.partMovementLimits]),
-            (fbRules.forbidParallelFifths, possibility.parallelFifths, False),
-            (fbRules.forbidParallelOctaves, possibility.parallelOctaves, False),
-            (fbRules.forbidHiddenFifths, possibility.hiddenFifth, False),
-            (fbRules.forbidHiddenOctaves, possibility.hiddenOctave, False),
+            (True, possibility.partsSame, True, fbRules.lowPriorityRuleCost, [fbRules._partsToCheck]),
+            (fbRules._upperPartsRemainSame, possibility.upperPartsSame, True, fbRules.lowPriorityRuleCost),
+            (fbRules.forbidVoiceOverlap, possibility.voiceOverlap, False, fbRules.lowPriorityRuleCost),
+            (True, possibility.partMovementsWithinLimits, True, fbRules.lowPriorityRuleCost,
+             [fbRules.partMovementLimits]),
+            (fbRules.forbidParallelFifths, possibility.parallelFifths, False, fbRules.highPriorityRuleCost),
+            (fbRules.forbidParallelOctaves, possibility.parallelOctaves, False, fbRules.highPriorityRuleCost),
+            (fbRules.forbidHiddenFifths, possibility.hiddenFifth, False, fbRules.mediumPriorityRuleCost),
+            (fbRules.forbidHiddenOctaves, possibility.hiddenOctave, False, fbRules.mediumPriorityRuleCost),
             (fbRules.resolveAugmentedSixthProperly and isItalianAugmentedSixth,
              possibility.couldBeItalianA6Resolution,
-             True,
+             True, fbRules.lowPriorityRuleCost,
              [_unpackTriad(self.segmentChord), fbRules.restrictDoublingsInItalianA6Resolution]),
             *discouragePartMovement
         ]
@@ -360,7 +361,7 @@ class Segment:
         True       resolveAugmentedSixthSegment     None
         '''
         if fbRules is None:
-            fbRules = rules.Rules()
+            fbRules = rules_config.RulesConfig()
 
         isDominantSeventh = self.segmentChord.isDominantSeventh()
         isDiminishedSeventh = self.segmentChord.isDiminishedSeventh()
@@ -787,7 +788,7 @@ class Segment:
         :meth:`~music21.figuredBass.segment.Segment.singlePossibilityRules`
         from segmentA.
         '''
-        for (method, isCorrect, args) in self._singlePossibilityRuleChecking[True]:
+        for (method, isCorrect, cost, args) in self._singlePossibilityRuleChecking[True]:
             if not (method(possibA, *args) == isCorrect):
                 return False
         return True
@@ -799,19 +800,19 @@ class Segment:
         :meth:`~music21.figuredBass.segment.Segment.consecutivePossibilityRules`
         from segmentA.
         '''
-        for (method, isCorrect, args) in self._consecutivePossibilityRuleChecking[True]:
+        for (method, isCorrect, cost, args) in self._consecutivePossibilityRuleChecking[True]:
             if not (method(possibA, possibB, *args) == isCorrect):
                 return False
         return True
 
-    def _getConsecutivePossibilityWeight(self, possibA, possibB, enable_logging=False):
-        total_weight = 0
-        for (method, isCorrect, args) in self._consecutivePossibilityRuleChecking[True]:
+    def _getConsecutivePossibilityCost(self, possibA, possibB, enable_logging=False):
+        total_cost = 0
+        for (method, isCorrect, cost, args) in self._consecutivePossibilityRuleChecking[True]:
             if method(possibA, possibB, *args) != isCorrect:
                 if enable_logging:
-                    logging.log(logging.INFO, method.__name__)
-                total_weight += 1
-        return total_weight
+                    logging.log(logging.INFO, f"Cost += {cost} due to {method.__name__}")
+                total_cost += cost
+        return total_cost
 
     def _resolveOrdinarySegment(self, segmentB):
         '''
@@ -833,7 +834,7 @@ class Segment:
         correctB = segmentB.allCorrectSinglePossibilities()
         correctAB = itertools.product(correctA, correctB)
         return map(lambda possibAB: (
-            possibAB, self._getConsecutivePossibilityWeight(possibA=possibAB[0], possibB=possibAB[1])),
+            possibAB, self._getConsecutivePossibilityCost(possibA=possibAB[0], possibB=possibAB[1])),
                    correctAB
                    )
 
@@ -864,7 +865,7 @@ class Segment:
                     possibA=possibAB[1]),
                                    correctAB)
             return map(lambda possibAB: (
-                possibAB, self._getConsecutivePossibilityWeight(possibA=possibAB[0], possibB=possibAB[1])),
+                possibAB, self._getConsecutivePossibilityCost(possibA=possibAB[0], possibB=possibAB[1])),
                        correctAB
                        )
 
@@ -947,73 +948,20 @@ def _unpackTriad(threePartChord):
     return threePartChordInfo
 
 
-def _compileRules(rulesList, maxLength=4):
+def _compileRules(rulesList, maxLength=5):
     ruleChecking = collections.defaultdict(list)
     for ruleIndex in range(len(rulesList)):
         args = []
         if len(rulesList[ruleIndex]) == maxLength:
             args = rulesList[ruleIndex][-1]
-        if maxLength == 4:
-            (shouldRunMethod, method, isCorrect) = rulesList[ruleIndex][0:3]
-            ruleChecking[shouldRunMethod].append((method, isCorrect, args))
+        if maxLength == 5:
+            (shouldRunMethod, method, isCorrect, cost) = rulesList[ruleIndex][0:4]
+            ruleChecking[shouldRunMethod].append((method, isCorrect, cost, args))
         elif maxLength == 3:
             (shouldRunMethod, method) = rulesList[ruleIndex][0:2]
             ruleChecking[shouldRunMethod].append((method, args))
 
     return ruleChecking
-
-
-def printRules(rulesList, maxLength=4):
-    '''
-    Method which can print to the console rules inputted into
-    :meth:`~music21.figuredBass.segment.Segment.singlePossibilityRules`,
-    :meth:`~music21.figuredBass.segment.Segment.consecutivePossibilityRules`, and
-    :meth:`~music21.figuredBass.segment.Segment.specialResolutionRules`.
-    For the first two methods, maxLength is 4. For the third method, maxLength is 3.
-
-    OMIT_FROM_DOCS
-    maxLength is the maximum length of a rule, a rule which includes arguments,
-    because arguments are optional.
-    '''
-    MAX_SIZE = 30
-    for rule in rulesList:
-        if len(rule[1].__name__) >= MAX_SIZE:
-            MAX_SIZE = len(rule[1].__name__) + 2
-
-    def padMethod(m):
-        methodName = m.__name__[0:MAX_SIZE]
-        if len(methodName) < MAX_SIZE:
-            methodName += ' ' * (MAX_SIZE - len(methodName))
-        return methodName
-
-    methodStr = 'Method:' + ' ' * (MAX_SIZE - 7)
-    if maxLength == 4:
-        print(f'Will run:  {methodStr}Keep solutions which return:  Arguments:')
-    elif maxLength == 3:
-        print(f'Will run:  {methodStr}Arguments:')
-
-    for ruleIndex in range(len(rulesList)):
-        ruleToPrint = None
-        args = []
-        if len(rulesList[ruleIndex]) == maxLength:
-            args = rulesList[ruleIndex][-1]
-        if not args:
-            argsString = 'None'
-        else:
-            argsString = ''
-            for itemIndex in range(len(args)):
-                argsString += str(args[itemIndex])
-                if not itemIndex == len(args) - 1:
-                    argsString += ', '
-        if maxLength == 4:
-            (shouldRunMethod, method, isCorrect) = rulesList[ruleIndex][0:3]
-            method = padMethod(method)
-            ruleToPrint = f'{str(shouldRunMethod):11}{method}{str(isCorrect):30}{argsString}'
-        elif maxLength == 3:
-            (shouldRunMethod, method) = rulesList[ruleIndex][0:2]
-            method = padMethod(method)
-            ruleToPrint = f'{str(shouldRunMethod):11}{method}{argsString}'
-        print(ruleToPrint)
 
 
 class SegmentException(exceptions21.Music21Exception):
