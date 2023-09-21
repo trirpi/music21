@@ -626,14 +626,11 @@ class Realization:
 
         return list(reversed(reverse_progression))
 
-    def logPossibilityProgression(self, progression):
-        def formatPossibility(pos):
-            return '(' + ' '.join(p.nameWithOctave.ljust(3) for p in pos) + ')'
-
-        for i, segment in enumerate(self._segmentList[:-1]):
-            weight = segment._getConsecutivePossibilityCost(progression[i], progression[i + 1], enable_logging=True)
-            logging.log(logging.INFO,
-                        f"Cost {formatPossibility(progression[i])} -> {formatPossibility(progression[i + 1])}: {weight}.")
+    def log_possibility_progression(self, progression):
+        for i, seg_transition in enumerate(self._segment_transitions):
+            transition = seg_transition.transitions_matrix[progression[i]][progression[i + 1]]
+            weight = transition.get_cost(enable_logging=True)
+            logging.log(logging.INFO, f"Cost {transition}: {weight}.")
 
     def generateRealizationFromPossibilityProgression(self, possibilityProgression):
         '''
@@ -740,7 +737,7 @@ class Realization:
 
     def generateOptimalRealization(self):
         possibilityProgression = self.get_optimal_possibility_progression()
-        self.logPossibilityProgression(possibilityProgression)
+        self.log_possibility_progression(possibilityProgression)
         return self.generateRealizationFromPossibilityProgression(possibilityProgression)
 
     def generateRandomRealizations(self, amountToGenerate=20):

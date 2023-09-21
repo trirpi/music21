@@ -1,8 +1,7 @@
 import itertools
+import logging
 from collections import defaultdict
 from functools import cache
-
-from music21.improvedFiguredBass.segment import _compileRules
 
 
 class Transition:
@@ -14,10 +13,31 @@ class Transition:
         self.segment_b = segment_transition.segment_b
 
     @cache
-    def get_cost(self):
-        self.segment_a._consecutivePossibilityRuleChecking = _compileRules(
-            self.segment_a.consecutivePossibilityRules(self.segment_a.fbRules))
-        return self.segment_a._getConsecutivePossibilityCost(possibA=self.possib_a, possibB=self.possib_b)
+    def get_cost(self, enable_logging=False):
+        rulesList = self.segment_a.consecutivePossibilityRules(self.segment_a.fbRules)
+        rules = []
+
+        for rule in rulesList:
+            args = []
+            if len(rule) == 5:
+                args = rule[-1]
+            (should_run_method, method, is_correct, cost) = rule[:4]
+            if should_run_method:
+                rules.append((method, is_correct, cost, args))
+
+        total_cost = 0
+        for (method, isCorrect, cost, args) in rules:
+            if method(self.possib_a, self.possib_b, *args) != isCorrect:
+                if enable_logging:
+                    logging.log(logging.INFO, f"Cost += {cost} due to {method.__name__}")
+                total_cost += cost
+        return total_cost
+
+    def __repr__(self):
+        def format_possibility(pos):
+            return '(' + ' '.join(p.nameWithOctave.ljust(3) for p in pos) + ')'
+
+        return f"({format_possibility(self.possib_a)} -> {format_possibility(self.possib_b)})"
 
 
 class SegmentTransition:
