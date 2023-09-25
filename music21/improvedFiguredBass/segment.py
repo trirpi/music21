@@ -531,7 +531,9 @@ class Segment:
     def all_filtered_possibilities(self, rules: RuleSet):
         possibs = self.allSinglePossibilities()
         ctx = {"segment": self}
-        return [possib for possib in possibs if rules.get_cost(possib, context=ctx) <= rules.MAX_SINGLE_POSSIB_COST]
+        cost_possib_pairs = [(rules.get_cost(possib, context=ctx), possib) for possib in possibs]
+        cost_possib_pairs.sort()
+        return list(map(lambda x: x[1], cost_possib_pairs[:10]))
 
 
 # HELPER METHODS
