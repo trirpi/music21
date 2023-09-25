@@ -359,17 +359,17 @@ class FiguredBassLine:
         bassNoteIndex = 0
         previousBassNote = bassLine[bassNoteIndex]
         bassNote = currentMapping[allKeys[0]][-1]
-        previousSegment = segment.OverlaidSegment(bassNote, bassNote.editorial.notationString,
-                                                  self._fbScale,
-                                                  fbRules, numParts, maxPitch)
+        previousSegment = segment.Segment(bassNote, bassNote.editorial.notationString,
+                                          self._fbScale,
+                                          fbRules, numParts, maxPitch)
         previousSegment.quarterLength = previousBassNote.quarterLength
         segmentList.append(previousSegment)
         for k in allKeys[1:]:
             (startTime, unused_endTime) = k
             bassNote = currentMapping[k][-1]
-            currentSegment = segment.OverlaidSegment(bassNote, bassNote.editorial.notationString,
-                                                     self._fbScale,
-                                                     fbRules, numParts, maxPitch)
+            currentSegment = segment.Segment(bassNote, bassNote.editorial.notationString,
+                                             self._fbScale,
+                                             fbRules, numParts, maxPitch)
             for partNumber in range(1, len(currentMapping[k])):
                 upperPitch = currentMapping[k][partNumber - 1]
                 currentSegment.fbRules._partPitchLimits.append((partNumber, upperPitch))
@@ -386,9 +386,6 @@ class FiguredBassLine:
             segmentList.append(currentSegment)
             previousSegment = currentSegment
         return segmentList
-
-    def overlayPart(self, music21Part):
-        self._overlaidParts.append(music21Part)
 
     def realize(self, fbRules=None, numParts=4, maxPitch=None):
         # noinspection PyShadowingNames
@@ -584,10 +581,10 @@ class Realization:
             self._paddingLeft = fbLineOutputs['paddingLeft']
         self.keyboardStyleOutput = True
 
-        rule_set = RuleSet(RulesConfig())
+        self.rule_set = RuleSet(RulesConfig())
 
         self._segment_transitions = [
-            SegmentTransition(self._segmentList[i], self._segmentList[i + 1], rule_set)
+            SegmentTransition(self._segmentList[i], self._segmentList[i + 1], self.rule_set)
             for i in range(len(self._segmentList) - 1)
         ]
 
@@ -708,66 +705,10 @@ class Realization:
         sol.insert(0.0, bassLine)
         return sol
 
-    def generateAllRealizations(self):
-        '''
-        Generates all unique realizations as a :class:`~music21.stream.Score`.
-
-
-        .. warning:: This method is unoptimized, and may take a prohibitive amount
-            of time for a Realization which has more than 100 solutions.
-        '''
-        allSols = stream.Score()
-        possibilityProgressions = self.getAllPossibilityProgressions()
-        if not possibilityProgressions:
-            raise FiguredBassLineException('Zero solutions')
-        sol0 = self.generateRealizationFromPossibilityProgression(possibilityProgressions[0])
-        for music21Part in sol0:
-            allSols.append(music21Part)
-
-        for possibIndex in range(1, len(possibilityProgressions)):
-            solX = self.generateRealizationFromPossibilityProgression(
-                possibilityProgressions[possibIndex])
-            for partIndex in range(len(solX)):
-                for music21Measure in solX[partIndex]:
-                    allSols[partIndex].append(music21Measure)
-
-        return allSols
-
-    def generateRandomRealization(self):
-        '''
-        Generates a random unique realization as a :class:`~music21.stream.Score`.
-        '''
-        possibilityProgression = self.getRandomPossibilityProgression()
-        return self.generateRealizationFromPossibilityProgression(possibilityProgression)
-
-    def generateOptimalRealization(self):
+    def generate_optimal_realization(self):
         possibilityProgression = self.get_optimal_possibility_progression()
         self.log_possibility_progression(possibilityProgression)
         return self.generateRealizationFromPossibilityProgression(possibilityProgression)
-
-    def generateRandomRealizations(self, amountToGenerate=20):
-        '''
-        Generates *amountToGenerate* unique realizations as a :class:`~music21.stream.Score`.
-
-
-        .. warning:: This method is unoptimized, and may take a prohibitive amount
-            of time if amountToGenerate is more than 100.
-        '''
-        if amountToGenerate > self.getNumSolutions():
-            return self.generateAllRealizations()
-
-        allSols = stream.Score()
-        sol0 = self.generateRandomRealization()
-        for music21Part in sol0:
-            allSols.append(music21Part)
-
-        for unused_counter_solution in range(1, amountToGenerate):
-            solX = self.generateRandomRealization()
-            for partIndex in range(len(solX)):
-                for music21Measure in solX[partIndex]:
-                    allSols[partIndex].append(music21Measure)
-
-        return allSols
 
 
 _DOC_ORDER = [figuredBassFromStream, addLyricsToBassNote,

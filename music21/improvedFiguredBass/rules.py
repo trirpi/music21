@@ -3,13 +3,16 @@ import logging
 from abc import abstractmethod, ABC
 from functools import cache
 
-from music21 import voiceLeading
+from music21 import voiceLeading, pitch
 from music21.improvedFiguredBass.rules_config import RulesConfig
 
 
 class RuleSet:
+    MAX_SINGLE_POSSIB_COST = 100
+
     def __init__(self, conf: RulesConfig):
         self.config = conf
+
         self.rules = [
             ParallelFifths(cost=conf.highPriorityRuleCost),
             ParallelOctaves(cost=conf.highPriorityRuleCost),
@@ -25,14 +28,25 @@ class RuleSet:
             )
             for maxSeparation in range(2, 8)
         ]
+        self.single_rules = [
+            VoiceCrossing(cost=float('inf')),
+            IsIncomplete(cost=conf.mediumPriorityRuleCost),
+            UpperPartsWithinLimit(cost=conf.mediumPriorityRuleCost),
+            PitchesWithinLimit(cost=conf.mediumPriorityRuleCost),
+            LimitPartToPitch(cost=conf.highPriorityRuleCost)
+        ]
 
     def get_rules(self):
         return self.rules
 
-    def get_cost(self, possib_a, possib_b, context, enable_logging=False):
+    def get_cost(self, possib_a, possib_b=None, context=None, enable_logging=False):
         total_cost = 0
-        for rule in self.rules:
-            cost = rule.get_cost(possib_a, possib_b, context)
+        rules: list[Rule | SingleRule] = self.rules if possib_b is not None else self.single_rules
+        for rule in rules:
+            if possib_b is not None:
+                cost = rule.get_cost(possib_a, possib_b, context)
+            else:
+                cost = rule.get_cost(possib_a, context)
             if enable_logging and cost > 0:
                 logging.log(logging.INFO, f"Cost += {cost} due to {rule.__class__.__name__}")
             total_cost += cost
@@ -544,6 +558,198 @@ class UnpreparedNote(Rule):
                     break
             if not prepared: return True
         return False
+
+
+class SingleRule(ABC):
+    def __init__(self, cost):
+        self.cost = cost
+
+    @abstractmethod
+    def get_cost(self, possib_a, context):
+        pass
+
+
+class VoiceCrossing(SingleRule):
+    def get_cost(self, possib_a, context):
+        return self.cost if self.voiceCrossing(possib_a) else 0
+
+    def voiceCrossing(self, possibA):
+        for part1Index in range(len(possibA)):
+            higherPitch = possibA[part1Index]
+            for part2Index in range(part1Index + 1, len(possibA)):
+                lowerPitch = possibA[part2Index]
+                if higherPitch < lowerPitch:
+                    return True
+
+        return False
+
+
+class IsIncomplete(SingleRule):
+    def get_cost(self, possib_a, context):
+        return self.cost if self.isIncomplete(possib_a, context['segment'].pitchNamesInChord) else 0
+
+    def isIncomplete(self, possibA, pitchNamesToContain):
+        '''
+        Returns True if possibA is incomplete, if it doesn't contain at least
+        one of every pitch name in pitchNamesToContain.
+        For a Segment, pitchNamesToContain is
+        :attr:`~music21.figuredBass.segment.Segment.pitchNamesInChord`.
+
+
+        If possibA contains excessive pitch names, a PossibilityException is
+        raised, although this is not a concern with the current implementation
+        of fbRealizer.
+
+        >>> from music21.figuredBass import possibility
+        >>> C3 = pitch.Pitch('C3')
+        >>> E4 = pitch.Pitch('E4')
+        >>> G4 = pitch.Pitch('G4')
+        >>> C5 = pitch.Pitch('C5')
+        >>> Bb5 = pitch.Pitch('B-5')
+        >>> possibA1 = (C5, G4, E4, C3)
+        >>> pitchNamesA1 = ['C', 'E', 'G', 'B-']
+        >>> possibility.isIncomplete(possibA1, pitchNamesA1)  # Missing B-
+        True
+        >>> pitchNamesA2 = ['C', 'E', 'G']
+        >>> possibility.isIncomplete(possibA1, pitchNamesA2)
+        False
+        '''
+        isIncompleteV = False
+        pitchNamesContained = []
+        for givenPitch in possibA:
+            if givenPitch.name not in pitchNamesContained:
+                pitchNamesContained.append(givenPitch.name)
+        for pitchName in pitchNamesToContain:
+            if pitchName not in pitchNamesContained:
+                isIncompleteV = True
+        if not isIncompleteV and (len(pitchNamesContained) > len(pitchNamesToContain)):
+            isIncompleteV = False
+            # raise PossibilityException(str(possibA) + '
+            #        contains pitch names not found in pitchNamesToContain.')
+
+        return isIncompleteV
+
+
+class UpperPartsWithinLimit(SingleRule):
+    def get_cost(self, possib_a, context):
+        return self.cost if self.upperPartsWithinLimit(possib_a) else 0
+
+    def upperPartsWithinLimit(self, possibA, maxSemitoneSeparation=12):
+        '''
+        Returns True if the pitches in the upper parts of possibA
+        are found within maxSemitoneSeparation of each other. The
+        upper parts of possibA are all the pitches except the last.
+
+        The default value of maxSemitoneSeparation is 12 semitones,
+        enharmonically equivalent to a perfect octave. If this method
+        returns True for this default value, then all the notes in
+        the upper parts can be played by most adult pianists using
+        just the right hand.
+
+        >>> from music21.figuredBass import possibility
+        >>> C3 = pitch.Pitch('C3')
+        >>> E3 = pitch.Pitch('E3')
+        >>> E4 = pitch.Pitch('E4')
+        >>> G4 = pitch.Pitch('G4')
+        >>> C5 = pitch.Pitch('C5')
+        >>> possibA1 = (C5, G4, E4, C3)
+        >>> possibility.upperPartsWithinLimit(possibA1)
+        True
+
+
+        Here, C5 and E3 are separated by almost two octaves.
+
+
+        >>> possibA2 = (C5, G4, E3, C3)
+        >>> possibility.upperPartsWithinLimit(possibA2)
+        False
+        '''
+        areUpperPartsWithinLimit = True
+        if maxSemitoneSeparation is None:
+            return areUpperPartsWithinLimit
+
+        upperParts = possibA[0:len(possibA) - 1]
+        for part1Index in range(len(upperParts)):
+            higherPitch = upperParts[part1Index]
+            for part2Index in range(part1Index + 1, len(upperParts)):
+                lowerPitch = upperParts[part2Index]
+                if abs(higherPitch.ps - lowerPitch.ps) > maxSemitoneSeparation:
+                    areUpperPartsWithinLimit = False
+                    return areUpperPartsWithinLimit
+
+        return areUpperPartsWithinLimit
+
+
+class PitchesWithinLimit(SingleRule):
+    def get_cost(self, possib_a, context):
+        return self.cost if not self.pitchesWithinLimit(possib_a) else 0
+
+    def pitchesWithinLimit(self, possibA, maxPitch=pitch.Pitch('B5')):
+        '''
+        Returns True if all pitches in possibA are less than or equal to
+        the maxPitch provided. Comparisons between pitches are done using pitch
+        comparison methods, which are based on pitch space values
+        (see :class:`~music21.pitch.Pitch`).
+
+
+        Used in :class:`~music21.figuredBass.segment.Segment` to filter
+        resolutions of special Segments which can have pitches exceeding
+        the universal maxPitch of a :class:`~music21.figuredBass.realizer.FiguredBassLine`.
+
+
+        >>> from music21.figuredBass import possibility
+        >>> from music21.figuredBass import resolution
+        >>> G2 = pitch.Pitch('G2')
+        >>> D4 = pitch.Pitch('D4')
+        >>> F5 = pitch.Pitch('F5')
+        >>> B5 = pitch.Pitch('B5')
+        >>> domPossib = (B5, F5, D4, G2)
+        >>> possibility.pitchesWithinLimit(domPossib)
+        True
+        >>> resPossib = resolution.dominantSeventhToMajorTonic(domPossib)
+        >>> resPossib  # Contains C6 > B5
+        (<music21.pitch.Pitch C6>, <music21.pitch.Pitch E5>, <music21.pitch.Pitch C4>, <music21.pitch.Pitch C3>)
+        >>> possibility.pitchesWithinLimit(resPossib)
+        False
+        '''
+        for givenPitch in possibA:
+            if givenPitch > maxPitch:
+                return False
+
+        return True
+
+
+class LimitPartToPitch(SingleRule):
+    def get_cost(self, possib_a, context):
+        return self.cost if self.limitPartToPitch(possib_a) else 0
+
+    def limitPartToPitch(self, possibA, partPitchLimits=None):
+        '''
+        Takes in a dict, partPitchLimits containing (partNumber, partPitch) pairs, each
+        of which limits a part in possibA to a certain :class:`~music21.pitch.Pitch`.
+        Returns True if all limits are followed in possibA, False otherwise.
+
+        >>> from music21.figuredBass import possibility
+        >>> C4 = pitch.Pitch('C4')
+        >>> E4 = pitch.Pitch('E4')
+        >>> G4 = pitch.Pitch('G4')
+        >>> C5 = pitch.Pitch('C5')
+        >>> G5 = pitch.Pitch('G5')
+        >>> sopranoPitch = pitch.Pitch('G5')
+        >>> possibA1 = (C5, G4, E4, C4)
+        >>> possibility.limitPartToPitch(possibA1, {1: sopranoPitch})
+        False
+        >>> possibA2 = (G5, G4, E4, C4)
+        >>> possibility.limitPartToPitch(possibA2, {1: sopranoPitch})
+        True
+        '''
+        if partPitchLimits is None:
+            partPitchLimits = {}
+        for (partNumber, partPitch) in partPitchLimits.items():
+            if not (possibA[partNumber - 1] == partPitch):
+                return False
+
+        return True
 
 
 # HELPER METHODS

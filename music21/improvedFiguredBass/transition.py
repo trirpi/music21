@@ -41,8 +41,8 @@ class SegmentTransition:
 
         self.rule_set = rule_set
 
-        self.possibs_from = self.segment_a.allCorrectSinglePossibilities()
-        self.possibs_to = self.segment_b.allCorrectSinglePossibilities()
+        self.possibs_from = self.segment_a.all_filtered_possibilities(rule_set)
+        self.possibs_to = self.segment_b.all_filtered_possibilities(rule_set)
 
         self.transitions_matrix = defaultdict(lambda: defaultdict(Transition))
 

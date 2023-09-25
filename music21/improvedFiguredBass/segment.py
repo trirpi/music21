@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import collections
 import copy
-import functools
 import itertools
 import unittest
 
@@ -22,9 +21,9 @@ from music21 import note
 from music21 import pitch
 from music21 import scale
 from music21.figuredBass import realizerScale
-from music21.improvedFiguredBass import possibility
 from music21.improvedFiguredBass import resolution
 from music21.improvedFiguredBass import rules_config
+from music21.improvedFiguredBass.rules import RuleSet
 
 # used below
 _MOD = 'figuredBass.segment'
@@ -150,63 +149,6 @@ class Segment:
 
     # ------------------------------------------------------------------------------
     # EXTERNAL METHODS
-
-    def singlePossibilityRules(self, fbRules=None):
-        # noinspection PyShadowingNames
-        '''
-        A framework for storing single possibility rules and methods to be applied
-        in :meth:`~music21.figuredBass.segment.Segment.allCorrectSinglePossibilities`.
-        Takes in a :class:`~music21.figuredBass.rules.Rules` object, fbRules.
-        If None then a new rules object is created.
-
-        Items are added within this method in the following form:
-
-        (willRunOnlyIfTrue, methodToRun, keepSolutionsWhichReturn, optionalArgs)
-
-        These items are compiled internally when
-        :meth:`~music21.figuredBass.segment.Segment.allCorrectSinglePossibilities`
-        is called on a Segment. Here, the compilation of rules and
-        methods bases on a default fbRules is shown.
-
-        >>> from music21.figuredBass import segment
-        >>> segmentA = segment.Segment()
-        >>> allSingleRules = segmentA.singlePossibilityRules()
-        >>> segment.printRules(allSingleRules)
-        Will run:  Method:                       Keep solutions which return:  Arguments:
-        True       isIncomplete                  False                         ['C', 'E', 'G']
-        True       upperPartsWithinLimit         True                          12
-        True       voiceCrossing                 False                         None
-
-        Here, a modified fbRules is provided, which allows for incomplete possibilities.
-
-        >>> from music21.improvedFiguredBass import rules_config
-        >>> fbRules = rules_config.RulesConfig()
-        >>> fbRules.forbidIncompletePossibilities = False
-        >>> allSingleRules = segmentA.singlePossibilityRules(fbRules)
-        >>> segment.printRules(allSingleRules)
-        Will run:  Method:                       Keep solutions which return:  Arguments:
-        False      isIncomplete                  False                         ['C', 'E', 'G']
-        True       upperPartsWithinLimit         True                          12
-        True       voiceCrossing                 False                         None
-        '''
-        if fbRules is None:
-            fbRules = rules_config.RulesConfig()
-
-        singlePossibRules = [
-            (fbRules.forbidIncompletePossibilities,
-             possibility.isIncomplete,
-             False, fbRules.highPriorityRuleCost,
-             [self.pitchNamesInChord]),
-            (True,
-             possibility.upperPartsWithinLimit,
-             True, fbRules.highPriorityRuleCost,
-             [fbRules.upperPartsMaxSemitoneSeparation]),
-            (fbRules.forbidVoiceCrossing,
-             possibility.voiceCrossing,
-             False, fbRules.highPriorityRuleCost)
-        ]
-
-        return singlePossibRules
 
     def specialResolutionRules(self, fbRules=None):
         '''
@@ -586,70 +528,10 @@ class Segment:
         iterables.append([pitch.Pitch(self.bassNote.pitch.nameWithOctave)])
         return itertools.product(*iterables)
 
-    @functools.cache
-    def allCorrectSinglePossibilities(self):
-        '''
-        Uses :meth:`~music21.figuredBass.segment.Segment.allSinglePossibilities` and
-        returns an iterator through a set of correct possibilities for
-        a Segment, all possibilities which pass all filters in
-        :meth:`~music21.figuredBass.segment.Segment.singlePossibilityRules`.
-
-
-        >>> from music21.figuredBass import segment
-        >>> segmentA = segment.Segment()
-        >>> allPossib = segmentA.allSinglePossibilities()
-        >>> allCorrectPossib = segmentA.allCorrectSinglePossibilities()
-
-
-        Most of the 729 naive possibilities were filtered out using the default rules set,
-        leaving only 21.
-
-
-        >>> allPossibList = list(allPossib)
-        >>> len(allPossibList)
-        729
-        >>> allCorrectPossibList = list(allCorrectPossib)
-        >>> len(allCorrectPossibList)
-        21
-
-        >>> for i in (5, 12, 20):
-        ...   [str(p) for p in allCorrectPossibList[i]]
-        ['E4', 'G3', 'G3', 'C3']
-        ['C5', 'G4', 'E4', 'C3']
-        ['G5', 'G5', 'E5', 'C3']
-        '''
-        self._singlePossibilityRuleChecking = _compileRules(
-            self.singlePossibilityRules(self.fbRules))
-        allA = self.allSinglePossibilities()
-        return [possibA for possibA in allA if self._isCorrectSinglePossibility(possibA)]
-
-    # ------------------------------------------------------------------------------
-    # INTERNAL METHODS
-
-    def _isCorrectSinglePossibility(self, possibA):
-        '''
-        Takes in a possibility (possibA) from a segmentA (self) and returns True
-        if the possibility is correct given
-        :meth:`~music21.figuredBass.segment.Segment.singlePossibilityRules`
-        from segmentA.
-        '''
-        for (method, isCorrect, cost, args) in self._singlePossibilityRuleChecking[True]:
-            if not (method(possibA, *args) == isCorrect):
-                return False
-        return True
-
-
-class OverlaidSegment(Segment):
-    '''
-    Class to allow Segments to be overlaid with non-chord notes.
-    '''
-
-    def allSinglePossibilities(self):
-        iterables = [self.allPitchesAboveBass] * (self.numParts - 1)  # Parts 1 -> n-1
-        iterables.append([pitch.Pitch(self.bassNote.pitch.nameWithOctave)])  # Part n
-        for (partNumber, partPitch) in self.fbRules._partPitchLimits:
-            iterables[partNumber - 1] = [pitch.Pitch(partPitch.nameWithOctave)]
-        return itertools.product(*iterables)
+    def all_filtered_possibilities(self, rules: RuleSet):
+        possibs = self.allSinglePossibilities()
+        ctx = {"segment": self}
+        return [possib for possib in possibs if rules.get_cost(possib, context=ctx) <= rules.MAX_SINGLE_POSSIB_COST]
 
 
 # HELPER METHODS

@@ -150,7 +150,7 @@ class RulesConfig(prebase.ProtoM21Object):
 
     def __init__(self):
         # Single Possibility rules
-        self.forbidIncompletePossibilities = True
+        self.forbidIncompletePossibilities = False
         self.upperPartsMaxSemitoneSeparation = 12
         self.forbidVoiceCrossing = True
 
@@ -168,7 +168,6 @@ class RulesConfig(prebase.ProtoM21Object):
         self.restrictDoublingsInItalianA6Resolution = True
 
         self._upperPartsRemainSame = False
-        self._partPitchLimits = []
         self._partsToCheck = []
 
     def _reprInternal(self):
