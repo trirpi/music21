@@ -19,7 +19,7 @@ class RuleSet:
             HiddenFifth(cost=conf.lowPriorityRuleCost),
             HiddenOctave(cost=conf.lowPriorityRuleCost),
             VoiceOverlap(cost=conf.highPriorityRuleCost),
-            UpperPartsSame(cost=conf.lowPriorityRuleCost)
+            UpperPartsSame(cost=conf.lowPriorityRuleCost),
         ]
         self.rules += [
             PartMovementsWithinLimits(
@@ -31,11 +31,12 @@ class RuleSet:
         self.single_rules = [
             VoiceCrossing(cost=float('inf')),
             HasDuplicate(cost=float('inf')),
+            LimitPartToPitch(cost=conf.highPriorityRuleCost),
+            NoSecondInterval(cost=conf.highPriorityRuleCost),
+            DesiredNumVoices(cost=conf.highPriorityRuleCost),
             IsIncomplete(cost=conf.mediumPriorityRuleCost),
             UpperPartsWithinLimit(cost=conf.mediumPriorityRuleCost),
             PitchesWithinLimit(cost=conf.mediumPriorityRuleCost),
-            LimitPartToPitch(cost=conf.highPriorityRuleCost),
-            NoSecondInterval(cost=conf.highPriorityRuleCost)
         ]
 
     def get_rules(self):
@@ -52,6 +53,7 @@ class RuleSet:
             if enable_logging and cost > 0:
                 logging.log(logging.INFO, f"Cost += {cost} due to {rule.__class__.__name__}")
             total_cost += cost
+            if total_cost == float('inf'): return total_cost
         return total_cost
 
 
@@ -569,6 +571,12 @@ class SingleRule(ABC):
     @abstractmethod
     def get_cost(self, possib_a, context):
         pass
+
+
+class DesiredNumVoices(SingleRule):
+    def get_cost(self, possib_a, context):
+        desired_count = context['segment'].desired_num_parts
+        return self.cost * abs(len(possib_a) - desired_count)
 
 
 class NoSecondInterval(SingleRule):

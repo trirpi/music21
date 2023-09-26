@@ -148,6 +148,9 @@ class RulesConfig(prebase.ProtoM21Object):
         + specialResDoc
     )
 
+    MAX_PARTS = 6
+    MIN_PARTS = 2
+
     def __init__(self):
         # Single Possibility rules
         self.forbidIncompletePossibilities = False

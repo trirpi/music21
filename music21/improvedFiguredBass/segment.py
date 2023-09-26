@@ -107,10 +107,11 @@ class Segment:
                  notationString: str | None = None,
                  fbScale: realizerScale.FiguredBassScale | None = None,
                  fbRules: rules_config.RulesConfig | None = None,
-                 numParts=4,
+                 numParts=None,
                  maxPitch: str | pitch.Pitch = 'B5',
                  listOfPitches=None,
-                 play_offsets=None):
+                 play_offsets=None,
+                 desired_num_parts=3):
         if isinstance(bassNote, str):
             bassNote = note.Note(bassNote)
         if isinstance(maxPitch, str):
@@ -131,10 +132,11 @@ class Segment:
         self._singlePossibilityRuleChecking = None
         self._consecutivePossibilityRuleChecking = None
 
+        self.desired_num_parts = desired_num_parts
+
         self.melody_notes = set()
 
         self.bassNote = bassNote
-        self.numParts = numParts
         self._maxPitch = maxPitch
         self.play_offsets = play_offsets
         if notationString is None and listOfPitches is not None:
@@ -528,16 +530,24 @@ class Segment:
         ['C4', 'C4', 'G4', 'C3']
         ['G4', 'G3', 'C4', 'C3']
         '''
-        iterables = [self.allPitchesAboveBass] * (self.numParts - 1)
-        iterables.append([pitch.Pitch(self.bassNote.pitch.nameWithOctave)])
-        return itertools.product(*iterables)
+        result = []
+        min_range = max(self.fbRules.MIN_PARTS, self.desired_num_parts - 1)
+        max_range = min(self.fbRules.MAX_PARTS, self.desired_num_parts + 1)
+        for i in range(min_range, max_range + 1):
+            iterables = [self.allPitchesAboveBass] * (i - 1)
+            iterables.append([pitch.Pitch(self.bassNote.pitch.nameWithOctave)])
+            result += list(itertools.product(*iterables))
+        return result
 
     def all_filtered_possibilities(self, rules: RuleSet):
         possibs = self.allSinglePossibilities()
         ctx = {"segment": self}
-        cost_possib_pairs = [(rules.get_cost(possib, context=ctx), possib) for possib in possibs]
-        cost_possib_pairs.sort()
-        return list(map(lambda x: x[1], cost_possib_pairs[:10]))
+        pairs = []
+        for possib in possibs:
+            cost = rules.get_cost(possib, context=ctx)
+            if cost <= rules.MAX_SINGLE_POSSIB_COST:
+                pairs.append(possib)
+        return pairs[:10]  # TODO allow all
 
 
 # HELPER METHODS
