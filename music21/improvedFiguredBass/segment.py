@@ -109,7 +109,8 @@ class Segment:
                  fbRules: rules_config.RulesConfig | None = None,
                  numParts=4,
                  maxPitch: str | pitch.Pitch = 'B5',
-                 listOfPitches=None):
+                 listOfPitches=None,
+                 play_offsets=None):
         if isinstance(bassNote, str):
             bassNote = note.Note(bassNote)
         if isinstance(maxPitch, str):
@@ -130,9 +131,12 @@ class Segment:
         self._singlePossibilityRuleChecking = None
         self._consecutivePossibilityRuleChecking = None
 
+        self.melody_notes = set()
+
         self.bassNote = bassNote
         self.numParts = numParts
         self._maxPitch = maxPitch
+        self.play_offsets = play_offsets
         if notationString is None and listOfPitches is not None:
             # must be a chord symbol or roman num.
             self.pitchNamesInChord = listOfPitches

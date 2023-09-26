@@ -349,7 +349,7 @@ class FiguredBassLine:
             maxPitch = pitch.Pitch('B5')
         segmentList = []
         bassLine = self.generateBassLine()
-        if len(self._overlaidParts) >= 1:
+        if self._overlaidParts:
             self._overlaidParts.append(bassLine)
             currentMapping = checker.extractHarmonies(self._overlaidParts)
         else:
@@ -359,9 +359,10 @@ class FiguredBassLine:
         bassNoteIndex = 0
         previousBassNote = bassLine[bassNoteIndex]
         bassNote = currentMapping[allKeys[0]][-1]
+        play_offsets = allKeys[0]
         previousSegment = segment.Segment(bassNote, bassNote.editorial.notationString,
                                           self._fbScale,
-                                          fbRules, numParts, maxPitch)
+                                          fbRules, numParts, maxPitch, play_offsets=play_offsets)
         previousSegment.quarterLength = previousBassNote.quarterLength
         segmentList.append(previousSegment)
         for k in allKeys[1:]:
@@ -369,7 +370,7 @@ class FiguredBassLine:
             bassNote = currentMapping[k][-1]
             currentSegment = segment.Segment(bassNote, bassNote.editorial.notationString,
                                              self._fbScale,
-                                             fbRules, numParts, maxPitch)
+                                             fbRules, numParts, maxPitch, play_offsets=k)
             for partNumber in range(1, len(currentMapping[k])):
                 upperPitch = currentMapping[k][partNumber - 1]
                 currentSegment.fbRules._partPitchLimits.append((partNumber, upperPitch))
@@ -387,6 +388,7 @@ class FiguredBassLine:
             previousSegment = currentSegment
         return segmentList
 
+    # noinspection PyUnreachableCode
     def realize(self, fbRules=None, numParts=4, maxPitch=None):
         # noinspection PyShadowingNames
         '''
@@ -464,6 +466,7 @@ class FiguredBassLine:
                 break
 
         if listOfHarmonyObjects:
+            assert False, 'Not implemented'
             for harmonyObject in self._fbList:
                 listOfPitchesJustNames = []
                 for thisPitch in harmonyObject.pitches:
