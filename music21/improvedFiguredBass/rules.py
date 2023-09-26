@@ -24,16 +24,18 @@ class RuleSet:
         self.rules += [
             PartMovementsWithinLimits(
                 conf.lowPriorityRuleCost,
-                [(1, maxSeparation), (2, maxSeparation), (3, maxSeparation)]
+                [(1, maxSeparation - 1), (2, maxSeparation), (3, maxSeparation)]
             )
             for maxSeparation in range(2, 8)
         ]
         self.single_rules = [
             VoiceCrossing(cost=float('inf')),
+            HasDuplicate(cost=float('inf')),
             IsIncomplete(cost=conf.mediumPriorityRuleCost),
             UpperPartsWithinLimit(cost=conf.mediumPriorityRuleCost),
             PitchesWithinLimit(cost=conf.mediumPriorityRuleCost),
-            LimitPartToPitch(cost=conf.highPriorityRuleCost)
+            LimitPartToPitch(cost=conf.highPriorityRuleCost),
+            NoSecondInterval(cost=conf.highPriorityRuleCost)
         ]
 
     def get_rules(self):
@@ -396,7 +398,7 @@ class PartMovementsWithinLimits(Rule):
         self.limits = limits
 
     def get_cost(self, possib_a, possib_b, _):
-        return self.cost if self.part_movements_within_limits(possib_a, possib_b) else 0
+        return self.cost if not self.part_movements_within_limits(possib_a, possib_b) else 0
 
     @cache
     def part_movements_within_limits(self, possibA, possibB):
@@ -569,6 +571,15 @@ class SingleRule(ABC):
         pass
 
 
+class NoSecondInterval(SingleRule):
+    def get_cost(self, possib_a, context):
+        for i in range(len(possib_a) - 1):
+            p1 = possib_a[i]
+            p2 = possib_a[i + 1]
+            if p1.ps - p2.ps <= 1: return self.cost
+        return 0
+
+
 class VoiceCrossing(SingleRule):
     def get_cost(self, possib_a, context):
         return self.cost if self.voiceCrossing(possib_a) else 0
@@ -582,6 +593,11 @@ class VoiceCrossing(SingleRule):
                     return True
 
         return False
+
+
+class HasDuplicate(SingleRule):
+    def get_cost(self, possib_a, context):
+        return self.cost if len(possib_a) != len(set(possib_a)) else 0
 
 
 class IsIncomplete(SingleRule):
@@ -632,7 +648,7 @@ class IsIncomplete(SingleRule):
 
 class UpperPartsWithinLimit(SingleRule):
     def get_cost(self, possib_a, context):
-        return self.cost if self.upperPartsWithinLimit(possib_a) else 0
+        return self.cost if not self.upperPartsWithinLimit(possib_a) else 0
 
     def upperPartsWithinLimit(self, possibA, maxSemitoneSeparation=12):
         '''
@@ -721,7 +737,7 @@ class PitchesWithinLimit(SingleRule):
 
 class LimitPartToPitch(SingleRule):
     def get_cost(self, possib_a, context):
-        return self.cost if self.limitPartToPitch(possib_a) else 0
+        return self.cost if not self.limitPartToPitch(possib_a) else 0
 
     def limitPartToPitch(self, possibA, partPitchLimits=None):
         '''
