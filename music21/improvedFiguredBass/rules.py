@@ -1,5 +1,7 @@
 import itertools
 import logging
+import math
+import unittest
 from abc import abstractmethod, ABC
 from functools import cache
 
@@ -20,20 +22,16 @@ class RuleSet:
             HiddenOctave(cost=conf.lowPriorityRuleCost),
             VoiceOverlap(cost=conf.highPriorityRuleCost),
             UpperPartsSame(cost=conf.lowPriorityRuleCost),
+            MinimizeMovementsMiddleVoices(cost=conf.lowPriorityRuleCost),
+            MinimizeMovementsSopranoVoice(cost=conf.highPriorityRuleCost)
         ]
-        self.rules += [
-            PartMovementsWithinLimits(
-                conf.lowPriorityRuleCost,
-                [(1, maxSeparation - 1), (2, maxSeparation), (3, maxSeparation)]
-            )
-            for maxSeparation in range(2, 8)
-        ]
+
         self.single_rules = [
             VoiceCrossing(cost=float('inf')),
             HasDuplicate(cost=float('inf')),
-            LimitPartToPitch(cost=conf.highPriorityRuleCost),
+            LimitPartToPitch(cost=conf.mediumPriorityRuleCost),
             NoSecondInterval(cost=conf.highPriorityRuleCost),
-            DesiredNumVoices(cost=conf.highPriorityRuleCost),
+            DesiredNumVoices(cost=float('inf')),
             IsIncomplete(cost=conf.mediumPriorityRuleCost),
             UpperPartsWithinLimit(cost=conf.mediumPriorityRuleCost),
             PitchesWithinLimit(cost=conf.mediumPriorityRuleCost),
@@ -64,6 +62,21 @@ class Rule(ABC):
     @abstractmethod
     def get_cost(self, possib_a, possib_b, context):
         pass
+
+    def get_all_pair_possibs(self, possib_a, possib_b):
+        if len(possib_a) > len(possib_b):
+            return self.get_all_pair_possibs(possib_b, possib_a)
+        elif len(possib_a) == len(possib_b):
+            return [list(zip(possib_a, possib_a))]
+
+        result = []
+        n = len(possib_a)
+        m = len(possib_b)
+        for to_tuple in itertools.combinations(range(m), n):
+            from_tuple = tuple(range(n))
+            note_pairs = [(possib_a[f], possib_b[t]) for f, t in zip(from_tuple, to_tuple)]
+            result.append(tuple(note_pairs))
+        return result
 
 
 class ParallelFifths(Rule):
@@ -319,7 +332,16 @@ class VoiceOverlap(Rule):
         return self.cost if self.has_voice_overlap(possib_a, possib_b) else 0
 
     @cache
-    def has_voice_overlap(self, possibA, possibB):
+    def has_voice_overlap(self, possib_a, possib_b):
+        for pairs in self.get_all_pair_possibs(possib_a[1:-1], possib_b[1:-1]):
+            all_pairs = [(possib_a[0], possib_b[0])] + list(pairs) + [(possib_a[-1], possib_b[-1])]
+            possibs = list(zip(*all_pairs))
+            if not self.has_voice_overlap_equal(possibs[0], possibs[1]):
+                return False
+        return True
+
+    @cache
+    def has_voice_overlap_equal(self, possibA, possibB):
         '''
         Returns True if there is voice overlap between any two shared parts
         of possibA and possibB.
@@ -392,6 +414,69 @@ class VoiceOverlap(Rule):
                     return hasVoiceOverlap
 
         return hasVoiceOverlap
+
+
+class MinimizeMovementsMiddleVoices(Rule):
+    def get_cost(self, possib_a, possib_b, context=None):
+        diff = self.get_minimum_difference(possib_a, possib_b)
+        if diff == 0 and self.cost == float('inf'): return 0
+        return self.cost * diff / max(len(possib_a), len(possib_b))
+
+    def get_minimum_difference(self, possib_a, possib_b):
+        """
+        >>> from music21.improvedFiguredBass.rules import MinimizeMovementsMiddleVoices
+        >>> from music21.pitch import Pitch
+        >>> a = (Pitch('C5'), Pitch('G4'), Pitch('E4'), Pitch('C3'))
+        >>> b = (Pitch('C5'), Pitch('A4'), Pitch('E4'), Pitch('C4'), Pitch('E3'), Pitch('A2'))
+        >>> m = MinimizeMovementsMiddleVoices(cost=1)
+        >>> m.get_cost(a, b)
+        5
+        >>> a = (Pitch('A4'))
+        """
+        middle_left = self.get_all_pair_possibs(possib_a[1:-1], possib_b[1:-1])
+        possibs = []
+        min_diff = float('inf')
+        for possib in middle_left:
+            diff = 0
+            for a, b in possib:
+                diff += self.distance_between(a, b)
+            if diff < min_diff:
+                possibs = possib
+                min_diff = diff
+        possibs = list(possibs)
+        possibs.append((possib_a[0], possib_b[0]))
+        possibs.append((possib_a[-1], possib_b[-1]))
+        not_matched = set(possib_b)
+        for a, b in possibs:
+            if b in not_matched:
+                not_matched.remove(b)
+        for b in not_matched:
+            closest = None
+            dist = float('inf')
+            for p in possib_a:
+                if (w := self.distance_between(p, b)) < dist:
+                    closest = p
+                    dist = w
+            min_diff += dist
+            possibs.append((closest, b))
+        return min_diff
+
+    @staticmethod
+    def distance_between(part_a, part_b):
+        return math.ceil(abs(part_a.ps - part_b.ps) / 2)
+
+
+class MinimizeMovementsSopranoVoice(Rule):
+    def get_cost(self, possib_a, possib_b, context):
+        diff = self.distance_between(possib_a[0], possib_b[0])
+        if diff == 0 and self.cost == float('inf'):
+            return 0
+        else:
+            return math.floor(diff / 2) * self.cost
+
+    @staticmethod
+    def distance_between(part_a, part_b):
+        return abs(part_a.ps - part_b.ps)
 
 
 class PartMovementsWithinLimits(Rule):
@@ -533,7 +618,6 @@ class UnpreparedNote(Rule):
     @cache
     def has_unprepared_note(self, possibA, possibB, segmentB):
         '''
-
         >>> from music21.improvedFiguredBass import segment
         >>> C = pitch.Pitch("C3")
         >>> E = pitch.Pitch("E3")
@@ -576,7 +660,11 @@ class SingleRule(ABC):
 class DesiredNumVoices(SingleRule):
     def get_cost(self, possib_a, context):
         desired_count = context['segment'].desired_num_parts
-        return self.cost * abs(len(possib_a) - desired_count)
+        diff = abs(len(possib_a) - desired_count)
+        if self.cost == float('inf') and diff == 0:
+            return 0
+        else:
+            return self.cost * diff
 
 
 class NoSecondInterval(SingleRule):
@@ -802,3 +890,13 @@ def partPairs(possibA, possibB):
 
     '''
     return list(zip(possibA, possibB))
+
+
+class Test(unittest.TestCase):
+    pass
+
+
+if __name__ == '__main__':
+    import music21
+
+    music21.mainTest(Test)
