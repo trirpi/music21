@@ -10,7 +10,7 @@ from music21.improvedFiguredBass.rules_config import RulesConfig
 
 
 class RuleSet:
-    MAX_SINGLE_POSSIB_COST = 100
+    MAX_SINGLE_POSSIB_COST = 10000
 
     def __init__(self, conf: RulesConfig):
         self.config = conf
@@ -21,7 +21,7 @@ class RuleSet:
             HiddenFifth(cost=conf.lowPriorityRuleCost),
             HiddenOctave(cost=conf.lowPriorityRuleCost),
             VoiceOverlap(cost=conf.highPriorityRuleCost),
-            UpperPartsSame(cost=conf.lowPriorityRuleCost),
+            #             # UpperPartsSame(cost=conf.lowPriorityRuleCost),
             MinimizeMovementsMiddleVoices(cost=conf.lowPriorityRuleCost),
             MinimizeMovementsSopranoVoice(cost=conf.highPriorityRuleCost)
         ]
@@ -30,10 +30,10 @@ class RuleSet:
             VoiceCrossing(cost=float('inf')),
             HasDuplicate(cost=float('inf')),
             LimitPartToPitch(cost=conf.mediumPriorityRuleCost),
-            NoSecondInterval(cost=conf.highPriorityRuleCost),
+            NoSecondInterval(cost=float('inf')),
             DesiredNumVoices(cost=float('inf')),
             IsIncomplete(cost=conf.mediumPriorityRuleCost),
-            UpperPartsWithinLimit(cost=conf.mediumPriorityRuleCost),
+            UpperPartsWithinLimit(cost=2 * conf.highPriorityRuleCost),
             PitchesWithinLimit(cost=conf.mediumPriorityRuleCost),
         ]
 
@@ -463,7 +463,7 @@ class MinimizeMovementsMiddleVoices(Rule):
 
     @staticmethod
     def distance_between(part_a, part_b):
-        return math.ceil(abs(part_a.ps - part_b.ps) / 2)
+        return math.ceil(max(abs(part_a.ps - part_b.ps) / 2 - 1, 0))
 
 
 class MinimizeMovementsSopranoVoice(Rule):
@@ -672,7 +672,8 @@ class NoSecondInterval(SingleRule):
         for i in range(len(possib_a) - 1):
             p1 = possib_a[i]
             p2 = possib_a[i + 1]
-            if p1.ps - p2.ps <= 1: return self.cost
+            if p1.ps - p2.ps <= 2:
+                return self.cost
         return 0
 
 
@@ -776,20 +777,10 @@ class UpperPartsWithinLimit(SingleRule):
         >>> possibility.upperPartsWithinLimit(possibA2)
         False
         '''
-        areUpperPartsWithinLimit = True
-        if maxSemitoneSeparation is None:
-            return areUpperPartsWithinLimit
 
-        upperParts = possibA[0:len(possibA) - 1]
-        for part1Index in range(len(upperParts)):
-            higherPitch = upperParts[part1Index]
-            for part2Index in range(part1Index + 1, len(upperParts)):
-                lowerPitch = upperParts[part2Index]
-                if abs(higherPitch.ps - lowerPitch.ps) > maxSemitoneSeparation:
-                    areUpperPartsWithinLimit = False
-                    return areUpperPartsWithinLimit
-
-        return areUpperPartsWithinLimit
+        if len(possibA) < 3:
+            return True
+        return possibA[0].ps - possibA[-2].ps <= maxSemitoneSeparation
 
 
 class PitchesWithinLimit(SingleRule):
