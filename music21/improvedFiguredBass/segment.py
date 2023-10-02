@@ -132,6 +132,8 @@ class Segment:
         self._singlePossibilityRuleChecking = None
         self._consecutivePossibilityRuleChecking = None
 
+        self._filtered_possibilities = None
+
         self.desired_num_parts = desired_num_parts
 
         self.melody_notes = set()
@@ -540,14 +542,19 @@ class Segment:
         return result
 
     def all_filtered_possibilities(self, rules: RuleSet):
-        possibs = self.allSinglePossibilities()
+        if self._filtered_possibilities is None:
+            possibs = self.allSinglePossibilities()
+            pairs = []
+            for possib in possibs:
+                cost = self.get_cost(rules, possib)
+                if cost <= rules.MAX_SINGLE_POSSIB_COST:
+                    pairs.append(possib)
+            self._filtered_possibilities = pairs
+        return self._filtered_possibilities
+
+    def get_cost(self, rules, possib):
         ctx = {"segment": self}
-        pairs = []
-        for possib in possibs:
-            cost = rules.get_cost(possib, context=ctx)
-            if cost <= rules.MAX_SINGLE_POSSIB_COST:
-                pairs.append(possib)
-        return pairs[:10]  # TODO allow all
+        return rules.get_cost(possib, context=ctx)
 
 
 # HELPER METHODS
