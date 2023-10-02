@@ -33,7 +33,8 @@ class RuleSet:
             NoSecondInterval(cost=float('inf')),
             IsIncomplete(cost=conf.mediumPriorityRuleCost),
             UpperPartsWithinLimit(cost=2 * conf.highPriorityRuleCost),
-            PitchesWithinLimit(cost=conf.mediumPriorityRuleCost),
+            IsPlayable(cost=float('inf')),
+            PitchesWithinLimit(cost=float('inf')),
         ]
 
     def get_rules(self):
@@ -656,6 +657,21 @@ class SingleRule(ABC):
         pass
 
 
+class IsPlayable(SingleRule):
+    def get_cost(self, possib_a, context):
+        return self.cost if not self.is_playable(possib_a) else 0
+
+    def is_playable(self, possib_a):
+        if len(possib_a) < 5:
+            return self.playable_by_one_hand(possib_a[:-1])
+        else:
+            return self.playable_by_one_hand(possib_a[:-2]) and self.playable_by_one_hand(possib_a[-2:])
+
+    @staticmethod
+    def playable_by_one_hand(notes):
+        return notes[0].ps - notes[-1].ps <= 12
+
+
 class NoSecondInterval(SingleRule):
     def get_cost(self, possib_a, context):
         for i in range(len(possib_a) - 1):
@@ -776,7 +792,7 @@ class PitchesWithinLimit(SingleRule):
     def get_cost(self, possib_a, context):
         return self.cost if not self.pitchesWithinLimit(possib_a) else 0
 
-    def pitchesWithinLimit(self, possibA, maxPitch=pitch.Pitch('B5')):
+    def pitchesWithinLimit(self, possibA, maxPitch=pitch.Pitch('B5'), minRightHandPitch=pitch.Pitch('A3')):
         '''
         Returns True if all pitches in possibA are less than or equal to
         the maxPitch provided. Comparisons between pitches are done using pitch
@@ -804,9 +820,14 @@ class PitchesWithinLimit(SingleRule):
         >>> possibility.pitchesWithinLimit(resPossib)
         False
         '''
-        for givenPitch in possibA:
-            if givenPitch > maxPitch:
-                return False
+        if possibA[0] > maxPitch:
+            return False
+        if len(possibA) > 4:
+            lowestRightHandNote = possibA[-3]
+        else:
+            lowestRightHandNote = possibA[-2]
+        if lowestRightHandNote < minRightHandPitch:
+            return False
 
         return True
 

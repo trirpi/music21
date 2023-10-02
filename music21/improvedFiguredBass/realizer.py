@@ -47,6 +47,8 @@ import logging
 import typing as t
 import unittest
 
+from tqdm import tqdm
+
 from music21 import chord
 from music21 import clef
 from music21 import exceptions21
@@ -601,7 +603,8 @@ class Realization:
 
         for i, segment_transition in enumerate(self._segment_transitions):
             dp_entry = {}
-            for possib in segment_transition.possibs_to:
+            for possib in tqdm(segment_transition.possibs_to, leave=False,
+                               desc=f"Segment {i + 1}/{len(self._segment_transitions)}"):
                 best_prev = None
                 best_cost = float('inf')
                 for prev_possib, (prev_cost, _) in dp[-1].items():
@@ -636,15 +639,14 @@ class Realization:
             return '(' + ' '.join(p.nameWithOctave.ljust(3) for p in pos) + ')'
 
         t = self._segment_transitions[0]
-        logging.log(logging.INFO, f"Cost {progression[0]}: {t.segment_a.get_cost(t.rule_set, progression[0])}")
+        logging.log(logging.INFO,
+                    f"Cost {format_possibility(progression[0])}: {t.segment_a.get_cost(t.rule_set, progression[0])}")
         for i, seg_transition in enumerate(self._segment_transitions):
             transition = seg_transition.transitions_matrix[progression[i]][progression[i + 1]]
-            weight = transition.get_cost(enable_logging=True)
-            logging.log(logging.INFO, f"Cost {transition}: {weight}.")
+            transition.get_cost(enable_logging=True)
             t = self._segment_transitions[i]
             logging.log(logging.INFO,
-                        f"Cost {format_possibility(progression[i + 1])}: \
-                         {t.segment_b.get_cost(t.rule_set, progression[i + 1])}")
+                        f"Cost {format_possibility(progression[i + 1])}: {t.segment_b.get_cost(t.rule_set, progression[i + 1])}")
 
     def generateRealizationFromPossibilityProgression(self, possibilityProgression):
         '''
