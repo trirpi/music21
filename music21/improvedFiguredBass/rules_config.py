@@ -148,8 +148,17 @@ class RulesConfig(prebase.ProtoM21Object):
         + specialResDoc
     )
 
-    MAX_PARTS = 6
-    MIN_PARTS = 2
+    # number of parts range for each dynamic marking
+    DYNAMIC_RANGES = {
+        'ppp': [2, 3],
+        'pp': [2, 3],
+        'p': [3, 3],
+        'mp': [3, 4],
+        'mf': [3, 4],
+        'f': [4, 4],
+        'ff': [5, 6],
+        'fff': [5, 6]
+    }
 
     def __init__(self):
         # Single Possibility rules

@@ -111,7 +111,7 @@ class Segment:
                  maxPitch: str | pitch.Pitch = 'B5',
                  listOfPitches=None,
                  play_offsets=None,
-                 desired_num_parts=3):
+                 dynamic='mf'):
         if isinstance(bassNote, str):
             bassNote = note.Note(bassNote)
         if isinstance(maxPitch, str):
@@ -134,7 +134,7 @@ class Segment:
 
         self._filtered_possibilities = None
 
-        self.desired_num_parts = desired_num_parts
+        self.dynamic = dynamic
 
         self.melody_notes = set()
 
@@ -533,9 +533,8 @@ class Segment:
         ['G4', 'G3', 'C4', 'C3']
         '''
         result = []
-        min_range = max(self.fbRules.MIN_PARTS, self.desired_num_parts - 1)
-        max_range = min(self.fbRules.MAX_PARTS, self.desired_num_parts + 1)
-        for i in range(min_range, max_range + 1):
+        r = self.fbRules.DYNAMIC_RANGES[self.dynamic]
+        for i in range(r[0], r[1] + 1):
             iterables = [self.allPitchesAboveBass] * (i - 1)
             iterables.append([pitch.Pitch(self.bassNote.pitch.nameWithOctave)])
             result += list(itertools.product(*iterables))

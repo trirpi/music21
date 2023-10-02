@@ -31,7 +31,6 @@ class RuleSet:
             HasDuplicate(cost=float('inf')),
             LimitPartToPitch(cost=conf.mediumPriorityRuleCost),
             NoSecondInterval(cost=float('inf')),
-            DesiredNumVoices(cost=float('inf')),
             IsIncomplete(cost=conf.mediumPriorityRuleCost),
             UpperPartsWithinLimit(cost=2 * conf.highPriorityRuleCost),
             PitchesWithinLimit(cost=conf.mediumPriorityRuleCost),
@@ -655,16 +654,6 @@ class SingleRule(ABC):
     @abstractmethod
     def get_cost(self, possib_a, context):
         pass
-
-
-class DesiredNumVoices(SingleRule):
-    def get_cost(self, possib_a, context):
-        desired_count = context['segment'].desired_num_parts
-        diff = abs(len(possib_a) - desired_count)
-        if self.cost == float('inf') and diff == 0:
-            return 0
-        else:
-            return self.cost * diff
 
 
 class NoSecondInterval(SingleRule):
