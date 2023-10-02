@@ -632,10 +632,16 @@ class Realization:
         return list(reversed(reverse_progression))
 
     def log_possibility_progression(self, progression):
+        t = self._segment_transitions[0]
+        logging.log(logging.INFO, f"Cost {progression[0]}: {t.segment_a.get_cost(t.rule_set, progression[0])}")
         for i, seg_transition in enumerate(self._segment_transitions):
             transition = seg_transition.transitions_matrix[progression[i]][progression[i + 1]]
             weight = transition.get_cost(enable_logging=True)
             logging.log(logging.INFO, f"Cost {transition}: {weight}.")
+            logging.log(logging.INFO, f"Cost {transition}: {weight}.")
+            t = self._segment_transitions[i]
+            logging.log(logging.INFO,
+                        f"Cost {progression[i + 1]}: {t.segment_b.get_cost(t.rule_set, progression[i + 1])}")
 
     def generateRealizationFromPossibilityProgression(self, possibilityProgression):
         '''
