@@ -597,8 +597,11 @@ class Realization:
         """
         Returns a random unique possibility progression.
         """
+        first_transition = self._segment_transitions[0]
+        first_segment = self._segment_transitions[0].segment_a
+        rule_set = first_transition.rule_set
         dp = [  # Option, (cost, previous_option)
-            {possib: (0, None) for possib in self._segment_transitions[0].possibs_from}
+            {possib: (first_segment.get_cost(rule_set, possib), None) for possib in first_transition.possibs_from}
         ]
 
         for i, segment_transition in enumerate(self._segment_transitions):
@@ -609,7 +612,8 @@ class Realization:
                 best_cost = float('inf')
                 for prev_possib, (prev_cost, _) in dp[-1].items():
                     transition_cost = segment_transition.transitions_matrix[prev_possib][possib].get_cost()
-                    new_cost = prev_cost + transition_cost
+                    new_possib_cost = segment_transition.segment_b.get_cost(segment_transition.rule_set, possib)
+                    new_cost = prev_cost + transition_cost + new_possib_cost
                     if new_cost < best_cost:
                         best_prev = prev_possib
                         best_cost = new_cost

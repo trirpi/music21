@@ -704,6 +704,10 @@ class HasDuplicate(SingleRule):
 
 class IsIncomplete(SingleRule):
     def get_cost(self, possib_a, context):
+        needed_pitch_names = context['segment'].pitchNamesInChord.copy()
+        for note in context['segment'].melody_notes:
+            if note.step in needed_pitch_names:
+                needed_pitch_names.remove(note.step)
         return self.cost if self.isIncomplete(possib_a, context['segment'].pitchNamesInChord) else 0
 
     def isIncomplete(self, possibA, pitchNamesToContain):
