@@ -23,7 +23,8 @@ class RuleSet:
             VoiceOverlap(cost=conf.highPriorityRuleCost),
             #             # UpperPartsSame(cost=conf.lowPriorityRuleCost),
             MinimizeMovementsMiddleVoices(cost=conf.lowPriorityRuleCost),
-            MinimizeMovementsSopranoVoice(cost=conf.highPriorityRuleCost)
+            MinimizeMovementsSopranoVoice(cost=conf.highPriorityRuleCost),
+            UnpreparedNote(cost=conf.lowPriorityRuleCost),
         ]
 
         self.single_rules = [
@@ -637,14 +638,17 @@ class UnpreparedNote(Rule):
         >>> hasUnpreparedNote(possibAPrepared, possibB, segmentB)
         False
         '''
-        sevent = segmentB.segmentChord.seventh
-        if sevent is not None:
-            prepared = False
-            for n1, n2 in itertools.product(possibA, possibB):
-                if n1 == n2 and n2.pitchClass == sevent.pitchClass:
-                    prepared = True
-                    break
-            if not prepared: return True
+        seventh = segmentB.segmentChord.getChordStep(7)
+        if seventh is not None:
+            for n2 in possibB:
+                if n2.pitchClass == seventh.pitchClass and n2 not in possibA:
+                    return True
+
+        ninth = segmentB.segmentChord.getChordStep(9)
+        if ninth is not None:
+            for n2 in possibB:
+                if n2.pitchClass == ninth.pitchClass and n2 not in possibA:
+                    return True
         return False
 
 
