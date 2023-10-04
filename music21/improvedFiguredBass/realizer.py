@@ -587,7 +587,9 @@ class Realization:
         self.keyboardStyleOutput = True
 
         self.rule_set = RuleSet(RulesConfig())
+        self._segment_transitions = None
 
+    def initialize_segment_transition(self):
         self._segment_transitions = [
             SegmentTransition(self._segmentList[i], self._segmentList[i + 1], self.rule_set)
             for i in range(len(self._segmentList) - 1)
@@ -724,6 +726,7 @@ class Realization:
         return sol
 
     def generate_optimal_realization(self):
+        self.initialize_segment_transition()
         possibilityProgression = self.get_optimal_possibility_progression()
         self.log_possibility_progression(possibilityProgression)
         return self.generateRealizationFromPossibilityProgression(possibilityProgression)

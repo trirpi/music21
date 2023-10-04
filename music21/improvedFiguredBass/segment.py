@@ -132,8 +132,6 @@ class Segment:
         self._singlePossibilityRuleChecking = None
         self._consecutivePossibilityRuleChecking = None
 
-        self._filtered_possibilities = None
-
         self.dynamic = dynamic
 
         self.melody_notes = set()
@@ -541,15 +539,13 @@ class Segment:
         return result
 
     def all_filtered_possibilities(self, rules: RuleSet):
-        if self._filtered_possibilities is None:
-            possibs = self.allSinglePossibilities()
-            pairs = []
-            for possib in possibs:
-                cost = self.get_cost(rules, possib)
-                if cost <= rules.MAX_SINGLE_POSSIB_COST:
-                    pairs.append(possib)
-            self._filtered_possibilities = pairs
-        return self._filtered_possibilities
+        possibs = self.allSinglePossibilities()
+        pairs = []
+        for possib in possibs:
+            cost = self.get_cost(rules, possib)
+            if cost <= rules.MAX_SINGLE_POSSIB_COST:
+                pairs.append(possib)
+        return pairs
 
     def get_cost(self, rules, possib):
         ctx = {"segment": self}
