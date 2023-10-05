@@ -17,7 +17,7 @@ from music21 import exceptions21
 from music21 import pitch
 from music21 import prebase
 
-shorthandNotation = {(None,): [(5, 3)],
+shorthandNotation = {(None,): [(5, 3), (6, 3)],
                      (5,): [(5, 3)],
                      (6,): [(6, 3), (6, 4, 3)],
                      (7,): [(7, 5, 3)],

@@ -36,6 +36,7 @@ class RuleSet:
             UpperPartsWithinLimit(cost=2 * conf.highPriorityRuleCost),
             IsPlayable(cost=float('inf')),
             PitchesWithinLimit(cost=float('inf')),
+            AvoidSeventhChord(cost=conf.mediumPriorityRuleCost),
         ]
 
     def get_rules(self):
@@ -666,6 +667,18 @@ class SingleRule(ABC):
     @abstractmethod
     def get_cost(self, possib_a, context):
         pass
+
+
+class AvoidSeventhChord(SingleRule):
+    def get_cost(self, possib_a, context):
+        segment = context['segment']
+        if len(segment.segmentChord) <= 1:
+            return 0
+        classes = [p.pitchClass for p in segment.segmentChord[0].pitches]
+        for pitch in possib_a:
+            if pitch.pitchClass not in classes:
+                return self.cost
+        return 0
 
 
 class IsPlayable(SingleRule):
