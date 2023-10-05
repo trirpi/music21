@@ -496,14 +496,7 @@ class FiguredBassLine:
         else:
             segmentList = self.retrieveSegments(fbRules, numParts, maxPitch)
 
-        if len(segmentList) >= 2:
-            for segmentIndex in range(len(segmentList) - 1):
-                segmentA = segmentList[segmentIndex]
-                segmentB = segmentList[segmentIndex + 1]
-        elif len(segmentList) == 1:
-            segmentA = segmentList[0]
-            segmentA.correctA = list(segmentA.allCorrectSinglePossibilities())
-        elif not segmentList:
+        if not segmentList:
             raise FiguredBassLineException('No (bassNote, notationString) pairs to realize.')
 
         return Realization(realizedSegmentList=segmentList, inKey=self.inKey,
@@ -599,11 +592,10 @@ class Realization:
         """
         Returns a random unique possibility progression.
         """
-        first_transition = self._segment_transitions[0]
-        first_segment = self._segment_transitions[0].segment_a
-        rule_set = first_transition.rule_set
+        first_possibilities = self._segmentList[0].all_filtered_possibilities(self.rule_set)
+
         dp = [  # Option, (cost, previous_option)
-            {possib: (first_segment.get_cost(rule_set, possib), None) for possib in first_transition.possibs_from}
+            {possib: (self._segmentList[0].get_cost(self.rule_set, possib), None) for possib in first_possibilities}
         ]
 
         for i, segment_transition in enumerate(self._segment_transitions):
@@ -644,9 +636,9 @@ class Realization:
         def format_possibility(pos):
             return '(' + ' '.join(p.nameWithOctave.ljust(3) for p in pos) + ')'
 
-        t = self._segment_transitions[0]
+        first_segment = self._segmentList[0]
         logging.log(logging.INFO,
-                    f"Cost {format_possibility(progression[0])}: {t.segment_a.get_cost(t.rule_set, progression[0])}")
+                    f"Cost {format_possibility(progression[0])}: {first_segment.get_cost(self.rule_set, progression[0])}")
         for i, seg_transition in enumerate(self._segment_transitions):
             transition = seg_transition.transitions_matrix[progression[i]][progression[i + 1]]
             transition.get_cost(enable_logging=True)
