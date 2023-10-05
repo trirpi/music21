@@ -21,8 +21,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from music21.harmony import Harmony
-
-from music21.figuredBass import notation
+from music21.improvedFiguredBass import notation
 
 
 class FiguredBass(Harmony):
@@ -62,6 +61,7 @@ class FiguredBass(Harmony):
 
     * new in v9.3
     '''
+
     def __init__(self,
                  figureString: str = '',
                  *,
@@ -160,5 +160,5 @@ class FiguredBass(Harmony):
 # ------------------------------------------------------------------------------
 if __name__ == '__main__':
     import music21
-    music21.mainTest()
 
+    music21.mainTest()

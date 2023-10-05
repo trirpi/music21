@@ -3,9 +3,11 @@ from __future__ import annotations
 
 __all__ = [
     'harmony',
+    'notation',
+    'realizer',
+    'realizerScale',
     'rules',
     'rules_config',
-    'realizer',
     'resolution',
     'segment',
     'transition',
@@ -14,7 +16,9 @@ __all__ = [
 ]
 
 from music21.improvedFiguredBass import harmony
+from music21.improvedFiguredBass import notation
 from music21.improvedFiguredBass import realizer
+from music21.improvedFiguredBass import realizerScale
 from music21.improvedFiguredBass import resolution
 from music21.improvedFiguredBass import rules
 from music21.improvedFiguredBass import rules_config

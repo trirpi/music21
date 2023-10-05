@@ -20,7 +20,7 @@ from music21 import exceptions21
 from music21 import note
 from music21 import pitch
 from music21 import scale
-from music21.figuredBass import realizerScale
+from music21.improvedFiguredBass import realizerScale
 from music21.improvedFiguredBass import resolution
 from music21.improvedFiguredBass import rules_config
 from music21.improvedFiguredBass.rules import RuleSet
@@ -141,102 +141,22 @@ class Segment:
         self.play_offsets = play_offsets
         if notationString is None and listOfPitches is not None:
             # must be a chord symbol or roman num.
-            self.pitchNamesInChord = listOfPitches
+            self.pitchNamesInChord = [listOfPitches]
         # ------ Added to accommodate harmony.ChordSymbol and roman.RomanNumeral objects ------
         else:
             self.pitchNamesInChord = fbScale.getPitchNames(self.bassNote.pitch, notationString)
 
-        self.allPitchesAboveBass = getPitches(self.pitchNamesInChord,
-                                              self.bassNote.pitch,
-                                              self._maxPitch)
-        self.segmentChord = chord.Chord(self.allPitchesAboveBass,
-                                        quarterLength=bassNote.quarterLength)
+        self.allPitchesAboveBass = [getPitches(pitchNamesInChord,
+                                               self.bassNote.pitch,
+                                               self._maxPitch) for pitchNamesInChord in self.pitchNamesInChord
+                                    ]
+        self.segmentChord = [chord.Chord(allPitchesAboveBass,
+                                         quarterLength=bassNote.quarterLength) for allPitchesAboveBass in
+                             self.allPitchesAboveBass]
         self._environRules = environment.Environment(_MOD)
 
     # ------------------------------------------------------------------------------
     # EXTERNAL METHODS
-
-    def specialResolutionRules(self, fbRules=None):
-        '''
-        A framework for storing methods which perform special resolutions
-        on Segments. Unlike the methods in
-        :meth:`~music21.figuredBass.segment.Segment.singlePossibilityRules` and
-        :meth:`~music21.figuredBass.segment.Segment.consecutivePossibilityRules`,
-        these methods deal with the Segment itself, and rely on submethods
-        to resolve the individual possibilities accordingly depending on what
-        the resolution Segment is.
-
-        If fbRules is None, then a new rules.Rules() object is created.
-
-        Items are added within this method in the following form:
-
-
-        (willRunOnlyIfTrue, methodToRun, optionalArgs)
-
-
-        These items are compiled internally
-        when :meth:`~music21.figuredBass.segment.Segment.allCorrectConsecutivePossibilities`
-        is called on a Segment. Here, the compilation of rules and methods
-        based on a default fbRules is shown.
-
-        >>> from music21.figuredBass import segment
-        >>> segmentA = segment.Segment()
-        >>> allSpecialResRules = segmentA.specialResolutionRules()
-        >>> segment.printRules(allSpecialResRules, maxLength=3)
-        Will run:  Method:                          Arguments:
-        False      resolveDominantSeventhSegment    None
-        False      resolveDiminishedSeventhSegment  False
-        False      resolveAugmentedSixthSegment     None
-
-        Dominant Seventh Segment:
-
-        >>> segmentA = segment.Segment(bassNote=note.Note('B2'), notationString='6,5')
-        >>> allSpecialResRules = segmentA.specialResolutionRules()
-        >>> segment.printRules(allSpecialResRules, maxLength=3)
-        Will run:  Method:                          Arguments:
-        True       resolveDominantSeventhSegment    None
-        False      resolveDiminishedSeventhSegment  False
-        False      resolveAugmentedSixthSegment     None
-
-        Fully-Diminished Seventh Segment:
-
-        >>> segmentA = segment.Segment(bassNote=note.Note('B2'), notationString='-7')
-        >>> allSpecialResRules = segmentA.specialResolutionRules()
-        >>> segment.printRules(allSpecialResRules, maxLength=3)
-        Will run:  Method:                          Arguments:
-        False      resolveDominantSeventhSegment    None
-        True       resolveDiminishedSeventhSegment  False
-        False      resolveAugmentedSixthSegment     None
-
-        Augmented Sixth Segment:
-
-        >>> segmentA = segment.Segment(bassNote=note.Note('A-2'), notationString='#6,b5')
-        >>> allSpecialResRules = segmentA.specialResolutionRules()
-        >>> segment.printRules(allSpecialResRules, maxLength=3)
-        Will run:  Method:                          Arguments:
-        False      resolveDominantSeventhSegment    None
-        False      resolveDiminishedSeventhSegment  False
-        True       resolveAugmentedSixthSegment     None
-        '''
-        if fbRules is None:
-            fbRules = rules_config.RulesConfig()
-
-        isDominantSeventh = self.segmentChord.isDominantSeventh()
-        isDiminishedSeventh = self.segmentChord.isDiminishedSeventh()
-        isAugmentedSixth = self.segmentChord.isAugmentedSixth()
-
-        specialResRules = [
-            (fbRules.resolveDominantSeventhProperly and isDominantSeventh,
-             self.resolveDominantSeventhSegment),
-            (fbRules.resolveDiminishedSeventhProperly and isDiminishedSeventh,
-             self.resolveDiminishedSeventhSegment,
-             [fbRules.doubledRootInDim7]),
-            (fbRules.resolveAugmentedSixthProperly and isAugmentedSixth,
-             self.resolveAugmentedSixthSegment)
-        ]
-
-        return specialResRules
-
     def resolveDominantSeventhSegment(self, segmentB):
         # noinspection PyShadowingNames
         '''
@@ -532,10 +452,11 @@ class Segment:
         '''
         result = []
         r = self.fbRules.DYNAMIC_RANGES[self.dynamic]
-        for i in range(r[0], r[1] + 1):
-            iterables = [self.allPitchesAboveBass] * (i - 1)
-            iterables.append([pitch.Pitch(self.bassNote.pitch.nameWithOctave)])
-            result += list(itertools.product(*iterables))
+        for allPitchesAboveBass in self.allPitchesAboveBass:
+            for i in range(r[0], r[1] + 1):
+                iterables = [allPitchesAboveBass] * (i - 1)
+                iterables.append([pitch.Pitch(self.bassNote.pitch.nameWithOctave)])
+                result += list(itertools.product(*iterables))
         return result
 
     def all_filtered_possibilities(self, rules: RuleSet):

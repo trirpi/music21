@@ -638,13 +638,20 @@ class UnpreparedNote(Rule):
         >>> hasUnpreparedNote(possibAPrepared, possibB, segmentB)
         False
         '''
-        seventh = segmentB.segmentChord.getChordStep(7)
+        seventh = None
+        ninth = None
+        for segmentChord in segmentB.segmentChord:
+            pos = segmentChord.getChordStep(7)
+            if pos:
+                seventh = pos
+            pos = segmentChord.getChordStep(7)
+            if pos:
+                ninth = pos
         if seventh is not None:
             for n2 in possibB:
                 if n2.pitchClass == seventh.pitchClass and n2 not in possibA:
                     return True
 
-        ninth = segmentB.segmentChord.getChordStep(9)
         if ninth is not None:
             for n2 in possibB:
                 if n2.pitchClass == ninth.pitchClass and n2 not in possibA:
