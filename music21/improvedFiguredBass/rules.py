@@ -30,13 +30,13 @@ class RuleSet:
         self.single_rules = [
             VoiceCrossing(cost=float('inf')),
             HasDuplicate(cost=float('inf')),
-            LimitPartToPitch(cost=conf.mediumPriorityRuleCost),
+            LimitPartToPitch(cost=5),
             NoSecondInterval(cost=float('inf')),
-            IsIncomplete(cost=conf.mediumPriorityRuleCost),
+            IsIncomplete(cost=6),
             UpperPartsWithinLimit(cost=2 * conf.highPriorityRuleCost),
             IsPlayable(cost=float('inf')),
             PitchesWithinLimit(cost=float('inf')),
-            AvoidSeventhChord(cost=conf.mediumPriorityRuleCost),
+            AvoidSeventhChord(cost=7),
         ]
 
     def get_rules(self):
@@ -728,38 +728,17 @@ class HasDuplicate(SingleRule):
 
 class IsIncomplete(SingleRule):
     def get_cost(self, possib_a, context):
-        needed_pitch_names = context['segment'].pitchNamesInChord.copy()
-        for note in context['segment'].melody_notes:
-            if note.step in needed_pitch_names:
-                needed_pitch_names.remove(note.step)
-        return self.cost if self.isIncomplete(possib_a, context['segment'].pitchNamesInChord) else 0
+        needed_pitch_names = context['segment'].pitchNamesInChord
+        melody_notes = context['segment'].melody_notes
+        for pitch_names in needed_pitch_names:
+            if not self.isIncomplete(possib_a, pitch_names.copy(), melody_notes):
+                return 0
+        return self.cost
 
-    def isIncomplete(self, possibA, pitchNamesToContain):
-        '''
-        Returns True if possibA is incomplete, if it doesn't contain at least
-        one of every pitch name in pitchNamesToContain.
-        For a Segment, pitchNamesToContain is
-        :attr:`~music21.figuredBass.segment.Segment.pitchNamesInChord`.
-
-
-        If possibA contains excessive pitch names, a PossibilityException is
-        raised, although this is not a concern with the current implementation
-        of fbRealizer.
-
-        >>> from music21.figuredBass import possibility
-        >>> C3 = pitch.Pitch('C3')
-        >>> E4 = pitch.Pitch('E4')
-        >>> G4 = pitch.Pitch('G4')
-        >>> C5 = pitch.Pitch('C5')
-        >>> Bb5 = pitch.Pitch('B-5')
-        >>> possibA1 = (C5, G4, E4, C3)
-        >>> pitchNamesA1 = ['C', 'E', 'G', 'B-']
-        >>> possibility.isIncomplete(possibA1, pitchNamesA1)  # Missing B-
-        True
-        >>> pitchNamesA2 = ['C', 'E', 'G']
-        >>> possibility.isIncomplete(possibA1, pitchNamesA2)
-        False
-        '''
+    def isIncomplete(self, possibA, pitchNamesToContain, melody_notes):
+        for note in melody_notes:
+            if note in pitchNamesToContain:
+                pitchNamesToContain.remove(note)
         isIncompleteV = False
         pitchNamesContained = []
         for givenPitch in possibA:
