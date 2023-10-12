@@ -391,7 +391,7 @@ class FiguredBassLine:
         return segmentList
 
     # noinspection PyUnreachableCode
-    def realize(self, fbRules=None, numParts=4, maxPitch=None):
+    def realize(self, fbRules=None, numParts=4, maxPitch=None, rule_set=None):
         # noinspection PyShadowingNames
         '''
         Creates a :class:`~music21.figuredBass.segment.Segment`
@@ -501,7 +501,7 @@ class FiguredBassLine:
 
         return Realization(realizedSegmentList=segmentList, inKey=self.inKey,
                            inTime=self.inTime, overlaidParts=self._overlaidParts[0:-1],
-                           paddingLeft=self._paddingLeft)
+                           paddingLeft=self._paddingLeft, rule_set=rule_set)
 
     def _trimAllMovements(self, segmentList):
         '''
@@ -577,10 +577,32 @@ class Realization:
             self._overlaidParts = fbLineOutputs['overlaidParts']
         if 'paddingLeft' in fbLineOutputs:
             self._paddingLeft = fbLineOutputs['paddingLeft']
+        if 'rule_set' in fbLineOutputs:
+            self.rule_set = fbLineOutputs['rule_set']
+        else:
+            self.rule_set = RuleSet(RulesConfig())
+
         self.keyboardStyleOutput = True
 
-        self.rule_set = RuleSet(RulesConfig())
+        self.purge_intermediate_notes()
         self._segment_transitions = None
+
+    def purge_intermediate_notes(self):
+        idx_to_delete = []
+        for i in range(1, len(self._segmentList)-1):
+            seg = self._segmentList[i]
+            prev_seg = self._segmentList[i-1]
+            prev_pitch = prev_seg.bassNote.pitch.ps
+            next_pitch = self._segmentList[i+1].bassNote.pitch.ps
+            pitches_close = abs(seg.bassNote.pitch.ps - next_pitch) <= 2 and abs(seg.bassNote.pitch.ps - prev_pitch) <= 2
+            if (prev_seg.quarterLength <= 0.5 and seg.quarterLength <= 0.5
+                and seg.play_offsets[0] % 1 != 0 and pitches_close and not seg.notation_string):
+                idx_to_delete.append(i)
+
+        for i in idx_to_delete:
+            self._segmentList[i-1].quarterLength += self._segmentList[i].quarterLength
+        for i in reversed(idx_to_delete):
+            del self._segmentList[i]
 
     def initialize_segment_transition(self):
         self._segment_transitions = [
