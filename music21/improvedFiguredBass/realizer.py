@@ -391,7 +391,7 @@ class FiguredBassLine:
         return segmentList
 
     # noinspection PyUnreachableCode
-    def realize(self, fbRules=None, numParts=4, maxPitch=None, rule_set=None):
+    def realize(self, fbRules=None, numParts=4, maxPitch=None, rule_set=None, start_offset=0):
         # noinspection PyShadowingNames
         '''
         Creates a :class:`~music21.figuredBass.segment.Segment`
@@ -501,7 +501,7 @@ class FiguredBassLine:
 
         return Realization(realizedSegmentList=segmentList, inKey=self.inKey,
                            inTime=self.inTime, overlaidParts=self._overlaidParts[0:-1],
-                           paddingLeft=self._paddingLeft, rule_set=rule_set)
+                           paddingLeft=self._paddingLeft, rule_set=rule_set, start_offset=start_offset)
 
     def _trimAllMovements(self, segmentList):
         '''
@@ -581,6 +581,10 @@ class Realization:
             self.rule_set = fbLineOutputs['rule_set']
         else:
             self.rule_set = RuleSet(RulesConfig())
+        if 'start_offset' in fbLineOutputs:
+            self.start_offset = fbLineOutputs['start_offset']
+        else:
+            self.start_offset = 0
 
         self.keyboardStyleOutput = True
 
@@ -596,10 +600,10 @@ class Realization:
             next_pitch = self._segmentList[i+1].bassNote.pitch.ps
             pitches_close = abs(seg.bassNote.pitch.ps - next_pitch) <= 2 and abs(seg.bassNote.pitch.ps - prev_pitch) <= 2
             if (prev_seg.quarterLength <= 0.5 and seg.quarterLength <= 0.5
-                and seg.play_offsets[0] % 1 != 0 and pitches_close and not seg.notation_string):
+                and (seg.play_offsets[0] + self.start_offset) % 1 != 0 and pitches_close and not seg.notation_string):
                 idx_to_delete.append(i)
 
-        for i in idx_to_delete:
+        for i in reversed(idx_to_delete):
             self._segmentList[i-1].quarterLength += self._segmentList[i].quarterLength
         for i in reversed(idx_to_delete):
             del self._segmentList[i]
