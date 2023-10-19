@@ -31,7 +31,7 @@ class RuleSet:
             VoiceCrossing(cost=float('inf')),
             HasDuplicate(cost=float('inf')),
             LimitPartToPitch(cost=5),
-            NoSecondInterval(cost=float('inf')),
+            NoSmallSecondInterval(cost=float('inf')),
             IsIncomplete(cost=6),
             UpperPartsWithinLimit(cost=2 * conf.highPriorityRuleCost),
             IsPlayable(cost=float('inf')),
@@ -696,12 +696,12 @@ class IsPlayable(SingleRule):
         return notes[0].ps - notes[-1].ps <= 12
 
 
-class NoSecondInterval(SingleRule):
+class NoSmallSecondInterval(SingleRule):
     def get_cost(self, possib_a, context):
         for i in range(len(possib_a) - 1):
             p1 = possib_a[i]
             p2 = possib_a[i + 1]
-            if p1.ps - p2.ps <= 2:
+            if p1.ps - p2.ps <= 1:
                 return self.cost
         return 0
 
