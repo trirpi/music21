@@ -37,6 +37,7 @@ class RuleSet:
             IsPlayable(cost=float('inf')),
             PitchesWithinLimit(cost=float('inf')),
             AvoidSeventhChord(cost=7),
+            PitchesUnderMelody(cost=conf.lowPriorityRuleCost)
         ]
 
     def get_rules(self):
@@ -793,6 +794,14 @@ class UpperPartsWithinLimit(SingleRule):
         if len(possibA) < 3:
             return True
         return possibA[0].ps - possibA[-2].ps <= maxSemitoneSeparation
+
+
+class PitchesUnderMelody(SingleRule):
+    def get_cost(self, possib_a, context):
+        melody_notes = context['segment'].melody_notes
+        if not melody_notes:
+            return 0
+        return max(0, self.cost * (possib_a[0].ps - min([note.pitch.ps for note in melody_notes])))
 
 
 class PitchesWithinLimit(SingleRule):
