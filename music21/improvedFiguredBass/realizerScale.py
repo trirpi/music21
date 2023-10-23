@@ -20,6 +20,7 @@ from music21 import pitch
 from music21 import scale
 from music21.improvedFiguredBass import notation
 from music21.improvedFiguredBass.notation import convertToPitch
+from music21.pitch import Pitch
 
 scaleModes = {'major': scale.MajorScale,
               'minor': scale.MinorScale,
@@ -108,7 +109,10 @@ class FiguredBassScale:
                 pitchSD = (bassSD + numbers[i] - 1) % 7
                 samplePitch = self.realizerScale.pitchFromDegree(pitchSD)
                 pitchName = modifiers[i].modifyPitchName(samplePitch.name)
-                pitchNames.append(pitchName)
+                if i == len(numbers)-1 and (Pitch(pitchName).ps - bassPitch.ps) % 12 == 2:
+                    pitchNames.append(samplePitch.name)
+                else:
+                    pitchNames.append(pitchName)
 
             pitchNames.append(bassPitch.name)
             pitchNames.reverse()
