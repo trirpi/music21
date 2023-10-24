@@ -39,6 +39,7 @@ class RuleSet:
             AvoidSeventhChord(cost=7),
             PitchesUnderMelody(cost=conf.lowPriorityRuleCost),
             NotTooLow(cost=conf.highPriorityRuleCost),
+            ContainRoot(cost=float('inf')),
         ]
 
     def get_rules(self):
@@ -888,6 +889,18 @@ class NotTooLow(SingleRule):
         if bass_note <= pitch.Pitch("C3") and possib[-2].ps - bass_note.ps < 7:
             return self.cost
         return 0
+
+
+class ContainRoot(SingleRule):
+    def get_cost(self, possib, context):
+        segment = context['segment']
+        root = segment.segmentChord[0].root()
+        for p in possib:
+            if (p.ps - root.ps) % 12 == 0:
+                return 0
+        return self.cost
+
+
 
 # HELPER METHODS
 # --------------

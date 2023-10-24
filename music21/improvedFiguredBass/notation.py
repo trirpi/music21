@@ -25,12 +25,30 @@ shorthandNotation = {(None,): [(5, 3)], #, (6, 3)],
                      (11,): [(11, 9, 7, 5, 3)],
                      (13,): [(13, 11, 9, 7, 5, 3)],
                      (6, 5): [(6, 5, 3)],
+                     (6, 4): [(6, 4)],
                      (6, 3): [(8, 6, 3)],# (6, 4, 3)],
                      (4, 3): [(6, 4, 3)],
                      (4, 2): [(6, 4, 2)],
                      (2,): [(6, 4, 2)], #(7, 4, 2)],
                      (4,): [(4, 5, 8)],
                      }
+
+shortHandNotationBass = {
+    (None,): 1,
+    (5,): 1,
+    (6,): 6,
+    (7,): 1,
+    (9,): 1,
+    (11,): 1,
+    (13,): 1,
+    (6, 5): 6,
+    (6, 4): 6,
+    (6, 3): 6,
+    (4, 3): 4,
+    (4, 2): 2,
+    (2,): 2,
+    (4,): 4,
+}
 
 prefixes = ['+', '#', '++', '##']
 suffixes = ['\\']
@@ -218,6 +236,7 @@ class Notation(prebase.ProtoM21Object):
         self.modifierStrings: list = []
         self.extenders: list[bool] = []
         self.hasExtenders: bool = False
+        self.bass_note = None
         self._parseNotationColumn()
         self._translateToLonghand()
 
@@ -361,7 +380,9 @@ class Notation(prebase.ProtoM21Object):
         self.modifierStrings = []
 
         try:
+            assert oldNumbers in shorthandNotation
             newNumbers_possibs = shorthandNotation[oldNumbers]
+            self.bassNote = shortHandNotationBass[oldNumbers]
             for newNumbers in newNumbers_possibs:
                 newModifierStrings = []
 
