@@ -37,7 +37,8 @@ class RuleSet:
             IsPlayable(cost=float('inf')),
             PitchesWithinLimit(cost=float('inf')),
             AvoidSeventhChord(cost=7),
-            PitchesUnderMelody(cost=conf.lowPriorityRuleCost)
+            PitchesUnderMelody(cost=conf.lowPriorityRuleCost),
+            NotTooLow(cost=conf.highPriorityRuleCost),
         ]
 
     def get_rules(self):
@@ -880,6 +881,13 @@ class LimitPartToPitch(SingleRule):
 
         return True
 
+
+class NotTooLow(SingleRule):
+    def get_cost(self, possib, context):
+        bass_note = possib[-1]
+        if bass_note <= pitch.Pitch("C3") and possib[-2].ps - bass_note.ps < 7:
+            return self.cost
+        return 0
 
 # HELPER METHODS
 # --------------
