@@ -25,6 +25,7 @@ class RuleSet:
             MinimizeMovementsMiddleVoices(cost=conf.lowPriorityRuleCost),
             MinimizeMovementsSopranoVoice(cost=conf.highPriorityRuleCost),
             UnpreparedNote(cost=conf.lowPriorityRuleCost),
+            CounterMovement(cost=conf.lowPriorityRuleCost)
         ]
 
         self.single_rules = [
@@ -68,11 +69,50 @@ class Rule(ABC):
     def get_cost(self, possib_a, possib_b, context):
         pass
 
-    def get_all_pair_possibs(self, possib_a, possib_b):
+    @cache
+    def get_pairs(self, possib_a, possib_b):
+        if len(possib_a) == len(possib_b):
+            return [(a, b) for a, b in zip(possib_a, possib_b)]
         if len(possib_a) > len(possib_b):
-            return self.get_all_pair_possibs(possib_b, possib_a)
-        elif len(possib_a) == len(possib_b):
+            return [(b, a) for a, b in self.get_pairs(possib_b, possib_a)]
+        assert len(possib_a) < len(possib_b)
+
+        pairs = [(possib_a[0], possib_b[0]), (possib_a[-1], possib_b[-1])]
+
+        # get match all pairs of A with closest to B injectively
+        middle_left = self._get_all_pair_possibs(possib_a[1:-1], possib_b[1:-1])
+        possibs = []
+        min_diff = float('inf')
+        for possib in middle_left:
+            diff = 0
+            for a, b in possib:
+                diff += self.distance_between(a, b)
+            if diff < min_diff:
+                possibs = possib
+                min_diff = diff
+        pairs += list(possibs)
+
+        # match all unmatched nodes of B with A
+        not_matched = set(possib_b)
+        for a, b in pairs:
+            if b in not_matched:
+                not_matched.remove(b)
+        for b in not_matched:
+            closest = None
+            dist = float('inf')
+            for p in possib_a:
+                if (w := self.distance_between(p, b)) < dist:
+                    closest = p
+                    dist = w
+            min_diff += dist
+            pairs.append((closest, b))
+        return pairs
+
+    def _get_all_pair_possibs(self, possib_a, possib_b):
+        if len(possib_a) == len(possib_b):
             return [list(zip(possib_a, possib_a))]
+
+        assert len(possib_a) < len(possib_b)
 
         result = []
         n = len(possib_a)
@@ -83,21 +123,26 @@ class Rule(ABC):
             result.append(tuple(note_pairs))
         return result
 
+    @staticmethod
+    def distance_between(part_a, part_b):
+        return math.ceil(max(abs(part_a.ps - part_b.ps) / 2 - 1, 0))
+
+
 
 class ParallelFifths(Rule):
 
     def get_cost(self, possib_a, possib_b, _):
-        return self.cost if self.hasParallelFifths(possib_a, possib_b) else 0
+        return self.cost if self.has_parallel_fifths(possib_a, possib_b) else 0
 
     @cache
-    def hasParallelFifths(self, possibA, possibB):
-        hasParallelFifths = False
-        pairsList = partPairs(possibA, possibB)
+    def has_parallel_fifths(self, possib_a, possib_b):
+        has_parallel_fifths = False
+        pairs_list = self.get_pairs(possib_a, possib_b)
 
-        for pair1Index in range(len(pairsList)):
-            (higherPitchA, higherPitchB) = pairsList[pair1Index]
-            for pair2Index in range(pair1Index + 1, len(pairsList)):
-                (lowerPitchA, lowerPitchB) = pairsList[pair2Index]
+        for pair1Index in range(len(pairs_list)):
+            (higherPitchA, higherPitchB) = pairs_list[pair1Index]
+            for pair2Index in range(pair1Index + 1, len(pairs_list)):
+                (lowerPitchA, lowerPitchB) = pairs_list[pair2Index]
                 if not abs(higherPitchA.ps - lowerPitchA.ps) % 12 == 7:
                     continue
                 if not abs(higherPitchB.ps - lowerPitchB.ps) % 12 == 7:
@@ -106,11 +151,11 @@ class ParallelFifths(Rule):
                 pitchQuartet = (lowerPitchA, lowerPitchB, higherPitchA, higherPitchB)
                 vlq = voiceLeading.VoiceLeadingQuartet(*pitchQuartet)
                 if vlq.parallelFifth():
-                    hasParallelFifths = True
-                if hasParallelFifths:
-                    return hasParallelFifths
+                    has_parallel_fifths = True
+                if has_parallel_fifths:
+                    return has_parallel_fifths
 
-        return hasParallelFifths
+        return has_parallel_fifths
 
 
 class ParallelOctaves(Rule):
@@ -172,7 +217,7 @@ class ParallelOctaves(Rule):
         False
         '''
         hasParallelOctaves = False
-        pairsList = partPairs(possibA, possibB)
+        pairsList = self.get_pairs(possibA, possibB)
 
         for pair1Index in range(len(pairsList)):
             (higherPitchA, higherPitchB) = pairsList[pair1Index]
@@ -255,7 +300,7 @@ class HiddenFifth(Rule):
         False
         '''
         hasHiddenFifth = False
-        pairsList = partPairs(possibA, possibB)
+        pairsList = self.get_pairs(possibA, possibB)
         (highestPitchA, highestPitchB) = pairsList[0]
         (lowestPitchA, lowestPitchB) = pairsList[-1]
 
@@ -318,7 +363,7 @@ class HiddenOctave(Rule):
         False
         '''
         hasHiddenOctave = False
-        pairsList = partPairs(possibA, possibB)
+        pairsList = self.get_pairs(possibA, possibB)
         (highestPitchA, highestPitchB) = pairsList[0]
         (lowestPitchA, lowestPitchB) = pairsList[-1]
 
@@ -338,11 +383,10 @@ class VoiceOverlap(Rule):
 
     @cache
     def has_voice_overlap(self, possib_a, possib_b):
-        for pairs in self.get_all_pair_possibs(possib_a[1:-1], possib_b[1:-1]):
-            all_pairs = [(possib_a[0], possib_b[0])] + list(pairs) + [(possib_a[-1], possib_b[-1])]
-            possibs = list(zip(*all_pairs))
-            if not self.has_voice_overlap_equal(possibs[0], possibs[1]):
-                return False
+        all_pairs = self.get_pairs(possib_a, possib_b)
+        possibs = list(zip(*all_pairs))
+        if not self.has_voice_overlap_equal(possibs[0], possibs[1]):
+            return False
         return True
 
     @cache
@@ -423,52 +467,10 @@ class VoiceOverlap(Rule):
 
 class MinimizeMovementsMiddleVoices(Rule):
     def get_cost(self, possib_a, possib_b, context=None):
-        diff = self.get_minimum_difference(possib_a, possib_b)
+        pairs = self.get_pairs(possib_a, possib_b)
+        diff = sum([self.distance_between(a, b) for a, b in pairs])
         if diff == 0 and self.cost == float('inf'): return 0
         return self.cost * diff / max(len(possib_a), len(possib_b))
-
-    def get_minimum_difference(self, possib_a, possib_b):
-        """
-        >>> from music21.improvedFiguredBass.rules import MinimizeMovementsMiddleVoices
-        >>> from music21.pitch import Pitch
-        >>> a = (Pitch('C5'), Pitch('G4'), Pitch('E4'), Pitch('C3'))
-        >>> b = (Pitch('C5'), Pitch('A4'), Pitch('E4'), Pitch('C4'), Pitch('E3'), Pitch('A2'))
-        >>> m = MinimizeMovementsMiddleVoices(cost=1)
-        >>> m.get_cost(a, b)
-        5
-        >>> a = (Pitch('A4'))
-        """
-        middle_left = self.get_all_pair_possibs(possib_a[1:-1], possib_b[1:-1])
-        possibs = []
-        min_diff = float('inf')
-        for possib in middle_left:
-            diff = 0
-            for a, b in possib:
-                diff += self.distance_between(a, b)
-            if diff < min_diff:
-                possibs = possib
-                min_diff = diff
-        possibs = list(possibs)
-        possibs.append((possib_a[0], possib_b[0]))
-        possibs.append((possib_a[-1], possib_b[-1]))
-        not_matched = set(possib_b)
-        for a, b in possibs:
-            if b in not_matched:
-                not_matched.remove(b)
-        for b in not_matched:
-            closest = None
-            dist = float('inf')
-            for p in possib_a:
-                if (w := self.distance_between(p, b)) < dist:
-                    closest = p
-                    dist = w
-            min_diff += dist
-            possibs.append((closest, b))
-        return min_diff
-
-    @staticmethod
-    def distance_between(part_a, part_b):
-        return math.ceil(max(abs(part_a.ps - part_b.ps) / 2 - 1, 0))
 
 
 class MinimizeMovementsSopranoVoice(Rule):
@@ -662,6 +664,12 @@ class UnpreparedNote(Rule):
                     return True
         return False
 
+
+class CounterMovement(Rule):
+    def get_cost(self, possib_a, possib_b, context):
+        if possib_a[0] > possib_b[0] and possib_a[-1] < possib_b[-1]:
+            return 0
+        return self.cost
 
 class SingleRule(ABC):
     def __init__(self, cost):
