@@ -17,10 +17,12 @@ from music21 import exceptions21
 from music21 import pitch
 from music21 import prebase
 
-shorthandNotation = {(None,): [(5, 3)], #, (6, 3)],
+shorthandNotation = {(): [(5, 3)], #, (6, 3)],
                      (5,): [(5, 3)],
                      (6,): [(6, 3)], #, (6, 4, 3)],
                      (7,): [(7, 5, 3)],
+                     (7, 3): [(7, 5, 3)],
+                     (8, 5): [(5, 3)],
                      (9,): [(9, 7, 5, 3)],
                      (11,): [(11, 9, 7, 5, 3)],
                      (13,): [(13, 11, 9, 7, 5, 3)],
@@ -30,14 +32,17 @@ shorthandNotation = {(None,): [(5, 3)], #, (6, 3)],
                      (4, 3): [(6, 4, 3)],
                      (4, 2): [(6, 4, 2)],
                      (2,): [(6, 4, 2)], #(7, 4, 2)],
-                     (4,): [(4, 5, 8)],
+                     (4,): [(8, 5, 4)],
+                     (3,): [(8, 5, 3)],
                      }
 
 shortHandNotationBass = {
-    (None,): 1,
+    (): 1,
     (5,): 1,
     (6,): 6,
     (7,): 1,
+    (7, 3): 1,
+    (8, 5): 1,
     (9,): 1,
     (11,): 1,
     (13,): 1,
@@ -48,6 +53,7 @@ shortHandNotationBass = {
     (4, 2): 2,
     (2,): 2,
     (4,): 4,
+    (3,): 1,
 }
 
 prefixes = ['+', '#', '++', '##']
@@ -372,6 +378,7 @@ class Notation(prebase.ProtoM21Object):
         >>> notation2.modifierStrings
         ('-', '-')
         '''
+        self.numbers = tuple([a for a in self.numbers if a is not None])
         oldNumbers = self.numbers
         newNumbers = oldNumbers
         oldModifierStrings = self.modifierStrings
@@ -380,7 +387,7 @@ class Notation(prebase.ProtoM21Object):
         self.modifierStrings = []
 
         try:
-            assert oldNumbers in shorthandNotation
+            assert oldNumbers in shorthandNotation, oldNumbers
             newNumbers_possibs = shorthandNotation[oldNumbers]
             self.bassNote = shortHandNotationBass[oldNumbers]
             for newNumbers in newNumbers_possibs:
