@@ -158,7 +158,7 @@ class Segment:
         newPitchNamesInChord = []
         for name in pitch_names:
             if name in past_measure:
-                newName = past_measure[name].modifyPitchName(name)
+                newName = past_measure[name][0].modifyPitchName(name)
                 newPitchNamesInChord.append(newName)
             else:
                 newPitchNamesInChord.append(name)

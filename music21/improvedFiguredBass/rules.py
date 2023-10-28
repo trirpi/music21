@@ -41,6 +41,7 @@ class RuleSet:
             PitchesUnderMelody(cost=conf.lowPriorityRuleCost),
             NotTooLow(cost=conf.highPriorityRuleCost),
             ContainRoot(cost=float('inf')),
+            LessNotes(cost=conf.lowPriorityRuleCost),
         ]
 
     def get_rules(self):
@@ -909,6 +910,9 @@ class ContainRoot(SingleRule):
         return self.cost
 
 
+class LessNotes(SingleRule):
+    def get_cost(self, possib_a, context):
+        return max(0,(len(possib_a) - 2)) * self.cost
 
 # HELPER METHODS
 # --------------
