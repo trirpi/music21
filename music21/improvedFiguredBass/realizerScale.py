@@ -90,10 +90,11 @@ class FiguredBassScale:
         >>> fbScale.getPitchNames('C#3', '-7')  # Fully diminished seventh chord
         ['C#', 'E', 'G', 'B-']
         '''
-
         bassPitch = convertToPitch(bassPitch)  # Convert string to pitch (if necessary)
         bassSD = self.realizerScale.getScaleDegreeFromPitch(bassPitch)
         nt = notation.Notation(notationString)
+        self.modify = {}
+
         if bassSD is None:
             bassPitchCopy = copy.deepcopy(bassPitch)
             bassNote = note.Note(bassPitchCopy)
@@ -108,11 +109,9 @@ class FiguredBassScale:
             for i in range(len(numbers)):
                 pitchSD = (bassSD + numbers[i] - 1) % 7
                 samplePitch = self.realizerScale.pitchFromDegree(pitchSD)
-                pitchName = modifiers[i].modifyPitchName(samplePitch.name)
-                if i == len(numbers)-1 and (Pitch(pitchName).ps - bassPitch.ps) % 12 == 2:
-                    pitchNames.append(samplePitch.name)
-                else:
-                    pitchNames.append(pitchName)
+                pitchNames.append(samplePitch.name)
+                if modifiers[i].accidental is not None:
+                    self.modify[samplePitch.name] = modifiers[i]
 
             pitchNames.append(bassPitch.name)
             pitchNames.reverse()

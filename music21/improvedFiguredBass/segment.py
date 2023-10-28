@@ -114,6 +114,7 @@ class Segment:
                  dynamic='mf'):
         if isinstance(bassNote, str):
             bassNote = note.Note(bassNote)
+        self.bassNote = bassNote
         if isinstance(maxPitch, str):
             maxPitch = pitch.Pitch(maxPitch)
 
@@ -122,6 +123,7 @@ class Segment:
                 _defaultRealizerScale['scale'] = realizerScale.FiguredBassScale()
             fbScale = _defaultRealizerScale['scale']  # save the time of making it
         assert fbScale is not None  # tells mypy that we have it now
+        self.fbScale = fbScale
 
         if fbRules is None:
             self.fbRules = rules_config.RulesConfig()
@@ -141,25 +143,38 @@ class Segment:
         self.play_offsets = play_offsets
         self.start_offset = 0
         self.notation_string = notationString
-        if notationString is None and listOfPitches is not None:
-            # must be a chord symbol or roman num.
-            self.pitchNamesInChord = [listOfPitches]
-            assert False, "Not implemented."
-        # ------ Added to accommodate harmony.ChordSymbol and roman.RomanNumeral objects ------
-        else:
-            self.pitchNamesInChord = fbScale.getPitchNames(self.bassNote.pitch, notationString)
 
-        self.allPitchesAboveBass = [getPitches(pitchNamesInChord,
-                                               self.bassNote.pitch,
-                                               self._maxPitch) for pitchNamesInChord in self.pitchNamesInChord
-                                    ]
-        self.segmentChord = [chord.Chord(allPitchesAboveBass,
-                                         quarterLength=bassNote.quarterLength) for allPitchesAboveBass in
-                             self.allPitchesAboveBass]
+    def set_pitch_names_in_chord(self):
+        self.pitchNamesInChord = self.fbScale.getPitchNames(self.bassNote.pitch, self.notation_string)
+
+
+    def update_pitch_names_in_chord(self, past_measure):
+        newPitchNamesInChord = []
+        for pitch_names in self.pitchNamesInChord:
+            newPitchNamesInChord.append(self.update_pitch_names_in_single_chord(pitch_names, past_measure))
+        self.pitchNamesInChord = newPitchNamesInChord
+
+    def update_pitch_names_in_single_chord(self, pitch_names, past_measure):
+        newPitchNamesInChord = []
+        for name in pitch_names:
+            if name in past_measure:
+                newName = past_measure[name].modifyPitchName(name)
+                newPitchNamesInChord.append(newName)
+            else:
+                newPitchNamesInChord.append(name)
+        return newPitchNamesInChord
+
+    def finish_initialization(self):
+        self.allPitchesAboveBass = [
+            getPitches(pitchNamesInChord, self.bassNote.pitch, self._maxPitch)
+            for pitchNamesInChord in self.pitchNamesInChord
+        ]
+        self.segmentChord = [
+            chord.Chord(allPitchesAboveBass, quarterLength=self.bassNote.quarterLength)
+            for allPitchesAboveBass in self.allPitchesAboveBass
+        ]
         self._environRules = environment.Environment(_MOD)
 
-    # ------------------------------------------------------------------------------
-    # EXTERNAL METHODS
     def resolveDominantSeventhSegment(self, segmentB):
         # noinspection PyShadowingNames
         '''
