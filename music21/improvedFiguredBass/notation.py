@@ -393,9 +393,10 @@ class Notation(prebase.ProtoM21Object):
             for newNumbers in newNumbers_possibs:
                 newModifierStrings = []
 
+                oldNumbers = list(oldNumbers)
+                if len(oldModifierStrings) > len(oldNumbers):
+                    oldNumbers.append(3)
                 oldNumbers = tuple(oldNumbers)
-                if not oldNumbers:
-                    oldNumbers = (3,)
 
                 for number in newNumbers:
                     newModifierString = None
