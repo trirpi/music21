@@ -16,8 +16,8 @@ class RuleSet:
         self.config = conf
 
         self.rules = [
-            ParallelFifths(cost=conf.highPriorityRuleCost),
-            ParallelOctaves(cost=conf.highPriorityRuleCost),
+            ParallelFifths(cost=2*conf.highPriorityRuleCost),
+            ParallelOctaves(cost=2*conf.highPriorityRuleCost),
             HiddenFifth(cost=conf.lowPriorityRuleCost),
             HiddenOctave(cost=conf.lowPriorityRuleCost),
             VoiceOverlap(cost=conf.highPriorityRuleCost),
@@ -25,7 +25,7 @@ class RuleSet:
             MinimizeMovementsMiddleVoices(cost=conf.lowPriorityRuleCost),
             MinimizeMovementsSopranoVoice(cost=conf.highPriorityRuleCost),
             UnpreparedNote(cost=conf.lowPriorityRuleCost),
-            CounterMovement(cost=conf.lowPriorityRuleCost)
+            CounterMovement(cost=conf.mediumPriorityRuleCost)
         ]
 
         self.single_rules = [
@@ -38,7 +38,7 @@ class RuleSet:
             IsPlayable(cost=float('inf')),
             PitchesWithinLimit(cost=float('inf')),
             AvoidSeventhChord(cost=7),
-            PitchesUnderMelody(cost=conf.lowPriorityRuleCost),
+            PitchesUnderMelody(cost=0.5*conf.lowPriorityRuleCost),
             NotTooLow(cost=conf.highPriorityRuleCost),
             ContainRoot(cost=float('inf')),
             LessNotes(cost=conf.lowPriorityRuleCost),
