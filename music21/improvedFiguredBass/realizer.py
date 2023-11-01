@@ -663,10 +663,15 @@ class Realization:
             return '(' + ' '.join(p.nameWithOctave.ljust(3) for p in pos) + ')'
 
         first_segment = self._segmentList[0]
+        measure = first_segment.bassNote.measureNumber
+        logging.log(logging.INFO, f"### Measure {measure} ###")
         logging.log(logging.INFO,
                     f"Cost {format_possibility(progression[0])}: {first_segment.get_cost(self.rule_set, progression[0])}")
         for i, seg_transition in enumerate(self._segment_transitions):
             transition = seg_transition.transitions_matrix[progression[i]][progression[i + 1]]
+            if (m := transition.segment_a.bassNote.measureNumber) > measure:
+                measure = m
+                logging.log(logging.INFO, f"### Measure {measure} ###")
             transition.get_cost(enable_logging=True)
             t = self._segment_transitions[i]
             logging.log(logging.INFO,
