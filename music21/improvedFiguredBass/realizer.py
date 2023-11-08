@@ -654,6 +654,25 @@ class Realization:
             reverse_progression.append(best_prev_possib)
             c, best_prev_possib = dp[i][best_prev_possib]
 
+        # --- new test ---
+        reverse_progression_2 = []
+        d = dp[-1]
+        best_possib = min(d, key=d.get)
+        best_cost = min(d.values())[0]
+        reverse_progression_2.append(best_possib)
+
+        for i in range(len(self._segment_transitions)-1, -1, -1):
+            segment_transition = self._segment_transitions[i]
+            for possib_from, (prev_cost, _) in dp[i].items():
+                to_possib_cost = segment_transition.segment_b.get_cost(segment_transition.rule_set, best_possib)
+                transition_cost = segment_transition.transitions_matrix[possib_from][best_possib].get_cost()
+                if transition_cost + to_possib_cost == best_cost - prev_cost:
+                    best_possib = possib_from
+                    best_cost = prev_cost
+                    reverse_progression_2.append(best_possib)
+                    break
+                assert False, "Should not get here."
+        # --- end test ---
         logging.log(logging.INFO, f"Found solution with cost {best_cost}.")
 
         return list(reversed(reverse_progression))
