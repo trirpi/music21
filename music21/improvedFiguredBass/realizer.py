@@ -161,9 +161,12 @@ def figuredBassFromStream(streamPart: stream.Stream) -> FiguredBassLine:
                     annotationString = updateAnnotationString(annotationString, lyric_line.text)
                 if i + 1 < len(n.lyrics):
                     annotationString += ', '
-            fb.addElement(n, annotationString)
+            if annotationString == "=":
+                fb._fbList[-1][0].duration.addDurationTuple(copy.deepcopy(n.duration))
+            else:
+                fb.addElement(copy.deepcopy(n), annotationString)
         else:
-            fb.addElement(n)
+            fb.addElement(copy.deepcopy(n))
 
     return fb
 
@@ -671,7 +674,6 @@ class Realization:
                     best_cost = prev_cost
                     reverse_progression_2.append(best_possib)
                     break
-                assert False, "Should not get here."
         # --- end test ---
         logging.log(logging.INFO, f"Found solution with cost {best_cost}.")
 

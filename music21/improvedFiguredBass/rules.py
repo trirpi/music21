@@ -59,7 +59,7 @@ class RuleSet:
                 logging.log(logging.INFO, f"Cost += {cost} due to {rule.__class__.__name__}")
             total_cost += cost
             if total_cost == float('inf'): return total_cost
-        return total_cost
+        return int(total_cost)
 
 
 class Rule(ABC):

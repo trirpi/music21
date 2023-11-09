@@ -44,7 +44,7 @@ class SegmentTransition:
         self.possibs_from = self.segment_a.all_filtered_possibilities(rule_set)
         self.possibs_to = self.segment_b.all_filtered_possibilities(rule_set)
 
-        self.transitions_matrix = defaultdict(lambda: defaultdict(Transition))
+        self.transitions_matrix = defaultdict(dict)
 
         for possib_from, possib_to in itertools.product(self.possibs_from, self.possibs_to):
             transition = Transition(possib_from, possib_to, self)
