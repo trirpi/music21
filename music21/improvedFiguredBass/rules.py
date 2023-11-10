@@ -7,10 +7,13 @@ from functools import cache
 
 from music21 import voiceLeading, pitch
 from music21.improvedFiguredBass.rules_config import RulesConfig
+from music21.note import Note
 
 
 class RuleSet:
     MAX_SINGLE_POSSIB_COST = 10000
+
+    MIN_INTERMEDIATE_NOTE = 3
 
     def __init__(self, conf: RulesConfig):
         self.config = conf
@@ -44,6 +47,12 @@ class RuleSet:
             LessNotes(cost=conf.lowPriorityRuleCost),
         ]
 
+        self.intermediate_rules = [
+            IsConnected(1),
+            IsFast(1),
+            HasAnnotation(float('inf')),
+        ]
+
     def get_rules(self):
         return self.rules
 
@@ -60,6 +69,9 @@ class RuleSet:
             total_cost += cost
             if total_cost == float('inf'): return total_cost
         return int(total_cost)
+
+    def get_no_skip_cost(self, prev, curr, next_, annotation):
+        return sum([rule.get_cost(prev, curr, next_, annotation) for rule in self.intermediate_rules])
 
 
 class Rule(ABC):
@@ -913,6 +925,46 @@ class ContainRoot(SingleRule):
 class LessNotes(SingleRule):
     def get_cost(self, possib_a, context):
         return max(0,(len(possib_a) - 2)) * self.cost
+
+
+class IntermediateNoteRule(ABC):
+    def __init__(self, cost):
+        self.cost = cost
+
+    @abstractmethod
+    def get_cost(self, previous: Note, note: Note, next_: Note, annotation):
+        pass
+
+
+class IsFast(IntermediateNoteRule):
+    def get_cost(self, previous: Note | None, note: Note, next_: Note | None, annotation):
+        total = 0
+        if previous is None or next_ is None:
+            return 0
+        if previous.duration.quarterLength == note.quarterLength == 0.5:
+            total += 2*self.cost
+        elif previous.duration.quarterLength == note.quarterLength < 0.5:
+            total += 3*self.cost
+        elif note.quarterLength <= 0.5:
+            total += self.cost
+        return total
+
+
+class IsConnected(IntermediateNoteRule):
+    def get_cost(self, previous: Note | None, note: Note, next_: Note | None, annotation):
+        total = 0
+        if previous is not None and self.is_connected(previous.pitch, note.pitch):
+            total += self.cost
+        if next_ is not None and self.is_connected(next_.pitch, note.pitch):
+            total += self.cost
+        return total
+
+    def is_connected(self, p1, p2):
+        return abs(p1.ps - p2.ps) <= 2
+
+class HasAnnotation(IntermediateNoteRule):
+    def get_cost(self, previous: Note, note: Note, next_: Note, annotation):
+        return -self.cost if annotation else 0
 
 # HELPER METHODS
 # --------------
