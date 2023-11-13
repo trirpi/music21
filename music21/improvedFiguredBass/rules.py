@@ -13,7 +13,7 @@ from music21.note import Note
 class RuleSet:
     MAX_SINGLE_POSSIB_COST = 10000
 
-    MIN_INTERMEDIATE_NOTE = 3
+    MIN_INTERMEDIATE_NOTE = 10
 
     def __init__(self, conf: RulesConfig):
         self.config = conf
@@ -48,9 +48,9 @@ class RuleSet:
         ]
 
         self.intermediate_rules = [
-            IsConnected(1),
-            IsFast(1),
-            HasAnnotation(float('inf')),
+            IsConnected(5*conf.highPriorityRuleCost),
+            IsFast(5*conf.highPriorityRuleCost),
+            HasAnnotation(conf.highPriorityRuleCost),
         ]
 
     def get_rules(self):
@@ -58,7 +58,10 @@ class RuleSet:
 
     def get_cost(self, possib_a, possib_b=None, context=None, enable_logging=False):
         total_cost = 0
-        rules: list[Rule | SingleRule] = self.rules if possib_b is not None else self.single_rules
+        if possib_b is None:
+            rules = self.single_rules + self.intermediate_rules
+        else:
+            rules = self.rules
         for rule in rules:
             if possib_b is not None:
                 cost = rule.get_cost(possib_a, possib_b, context)
@@ -68,10 +71,10 @@ class RuleSet:
                 logging.log(logging.INFO, f"Cost += {cost} due to {rule.__class__.__name__}")
             total_cost += cost
             if total_cost == float('inf'): return total_cost
-        return int(total_cost)
+        return int(1000*total_cost)/1000
 
     def get_no_skip_cost(self, prev, curr, next_, annotation):
-        return sum([rule.get_cost(prev, curr, next_, annotation) for rule in self.intermediate_rules])
+        return max(sum([rule.get_cost(prev, curr, next_, annotation) for rule in self.intermediate_rules]), 0)
 
 
 class Rule(ABC):
@@ -924,20 +927,26 @@ class ContainRoot(SingleRule):
 
 class LessNotes(SingleRule):
     def get_cost(self, possib_a, context):
-        return max(0,(len(possib_a) - 2)) * self.cost
+        return max(0, (len(possib_a) - 2)) * self.cost
 
 
-class IntermediateNoteRule(ABC):
+class IntermediateNoteRule(SingleRule):
     def __init__(self, cost):
-        self.cost = cost
+        super().__init__(cost)
+
+    def get_cost(self, possib_a, context):
+        curr = context['segment']
+        prev = None if curr.prev_segment is None else curr.prev_segment.bassNote
+        next_ = None if curr.next_segment is None else curr.next_segment.bassNote
+        return self.get_cost_intermediate(prev, curr.bassNote, next_, curr.notation_string)
 
     @abstractmethod
-    def get_cost(self, previous: Note, note: Note, next_: Note, annotation):
+    def get_cost_intermediate(self, previous: Note, note: Note, next_: Note, annotation):
         pass
 
 
 class IsFast(IntermediateNoteRule):
-    def get_cost(self, previous: Note | None, note: Note, next_: Note | None, annotation):
+    def get_cost_intermediate(self, previous: Note | None, note: Note, next_: Note | None, annotation):
         total = 0
         if previous is None or next_ is None:
             return 0
@@ -951,7 +960,7 @@ class IsFast(IntermediateNoteRule):
 
 
 class IsConnected(IntermediateNoteRule):
-    def get_cost(self, previous: Note | None, note: Note, next_: Note | None, annotation):
+    def get_cost_intermediate(self, previous: Note | None, note: Note, next_: Note | None, annotation):
         total = 0
         if previous is not None and self.is_connected(previous.pitch, note.pitch):
             total += self.cost
@@ -962,9 +971,10 @@ class IsConnected(IntermediateNoteRule):
     def is_connected(self, p1, p2):
         return abs(p1.ps - p2.ps) <= 2
 
+
 class HasAnnotation(IntermediateNoteRule):
-    def get_cost(self, previous: Note, note: Note, next_: Note, annotation):
-        return -self.cost if annotation else 0
+    def get_cost_intermediate(self, previous: Note, note: Note, next_: Note, annotation):
+        return 0 if annotation else self.cost
 
 # HELPER METHODS
 # --------------

@@ -64,7 +64,7 @@ from music21.improvedFiguredBass import rules_config
 from music21.improvedFiguredBass import segment
 from music21.improvedFiguredBass.rules import RuleSet
 from music21.improvedFiguredBass.rules_config import RulesConfig
-from music21.improvedFiguredBass.transition import SegmentTransition
+from music21.improvedFiguredBass.transition import SegmentTransition, Transition
 
 if t.TYPE_CHECKING:
     pass
@@ -618,22 +618,13 @@ class Realization:
             for i in range(len(self._segmentList) - 1)
         ]
 
-    def get_no_skip(self, i):
-        prev = self._segmentList[i-1].bassNote if i-1 > 0 else None
-        curr_s = self._segmentList[i]
-        next_ = self._segmentList[i].bassNote if i+1 < len(self._segmentList) else None
-        return self.rule_set.get_no_skip_cost(prev, curr_s.bassNote, next_, curr_s.notation_string)
-
-    def can_skip(self, i):
-        return i > 0 and not self._segmentList[i].notation_string   #self.get_no_skip(i) > self.rule_set.MIN_INTERMEDIATE_NOTE
-
     def get_optimal_possibility_progression(self):
         """
         Returns a random unique possibility progression.
         """
         first_possibilities = self._segmentList[0].all_filtered_possibilities(self.rule_set)
 
-        dp = [  # possibility: cost
+        dp = [  # (possibility, cost) dicts for each segment index i
             {possib: self._segmentList[0].get_cost(self.rule_set, possib) for possib in first_possibilities}
         ]
 
@@ -643,7 +634,7 @@ class Realization:
             dp_entry = {}
             for possib in tqdm(possibs_to, leave=False, desc=f"Segment {i + 1}/{len(possibs_to)}"):
                 best_cost = float('inf')
-                for segment_a_idx in range(i, -1, -1):
+                for segment_a_idx in range(i, max(-1, i-3), -1):
                     num_skips = i - segment_a_idx
                     segment_a = self._segmentList[segment_a_idx]
                     transition = SegmentTransition(segment_a, segment_b, self.rule_set)
@@ -655,9 +646,6 @@ class Realization:
 
                         best_cost = min(new_cost, best_cost)
 
-                    if not self.can_skip(segment_a_idx-1):
-                        break
-
                 dp_entry[possib] = best_cost
             dp.append(dp_entry)
 
@@ -665,13 +653,14 @@ class Realization:
         reverse_progression = []
         d = dp[-1]
         best_possib = min(d, key=d.get)
-        best_cost = min(d.values())
+        final_cost = min(d.values())
+        best_cost = final_cost
         reverse_progression.append((best_possib, 0))
 
         i = len(self._segmentList)-2
         while i >= 0:
             segment_b = self._segmentList[i+1]
-            for segment_a_idx in range(i, -1, -1):
+            for segment_a_idx in range(i, max(-1, i-3), -1):
                 num_skips = i - segment_a_idx
                 segment_a = self._segmentList[segment_a_idx]
                 transition = SegmentTransition(segment_a, segment_b, self.rule_set)
@@ -687,7 +676,7 @@ class Realization:
                         found = True
                         break
 
-                if found or not self.can_skip(segment_a_idx - 1):
+                if found:
                     break
             i -= 1
 
@@ -706,29 +695,31 @@ class Realization:
         for i in reversed(idx_to_delete):
             del self._segmentList[i]
 
-        logging.log(logging.INFO, f"Found solution with cost {best_cost}.")
+        logging.log(logging.INFO, f"Found solution with cost {final_cost}.")
 
         return result
 
     def log_possibility_progression(self, progression):
-        # def format_possibility(pos):
-        #     return '(' + ' '.join(p.nameWithOctave.ljust(3) for p in pos) + ')'
-        #
-        # first_segment = self._segmentList[0]
-        # measure = first_segment.bassNote.measureNumber
-        # logging.log(logging.INFO, f"### Measure {measure} ###")
-        # logging.log(logging.INFO,
-        #             f"Cost {format_possibility(progression[0])}: {first_segment.get_cost(self.rule_set, progression[0])}")
-        # for i, seg_transition in enumerate(self._segment_transitions):
-        #     transition = seg_transition.transitions_matrix[progression[i]][progression[i + 1]]
-        #     if (m := transition.segment_a.bassNote.measureNumber) > measure:
-        #         measure = m
-        #         logging.log(logging.INFO, f"### Measure {measure} ###")
-        #     transition.get_cost(enable_logging=True)
-        #     t = self._segment_transitions[i]
-        #     logging.log(logging.INFO,
-        #                 f"Cost {format_possibility(progression[i + 1])}: {t.segment_b.get_cost(t.rule_set, progression[i + 1])}")
-        pass
+        def format_possibility(pos):
+            return '(' + ' '.join(p.nameWithOctave.ljust(3) for p in pos) + ')'
+
+        possib_b = progression[0]
+        segment_b = self._segmentList[0]
+        measure = segment_b.bassNote.measureNumber
+        logging.log(logging.INFO, f"### Measure {measure} ###")
+        logging.log(logging.INFO,
+                    f"Cost {format_possibility(progression[0])}: {segment_b.get_cost(self.rule_set, progression[0])}")
+        for i in range(1, len(self._segmentList)):   #, seg_transition in enumerate(self._segment_transitions):
+            segment_a = segment_b
+            segment_b = self._segmentList[i]
+            possib_a = possib_b
+            possib_b = progression[i]
+            seg_transition = SegmentTransition(segment_a, segment_b, self.rule_set)
+            transition = Transition(possib_a, possib_b, seg_transition)
+            if (m := segment_a.bassNote.measureNumber) > measure:
+                measure = m
+                logging.log(logging.INFO, f"### Measure {measure} ###")
+            transition.get_cost(enable_logging=True)
 
     def generateRealizationFromPossibilityProgression(self, possibilityProgression):
         '''
