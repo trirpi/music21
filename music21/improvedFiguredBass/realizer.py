@@ -634,7 +634,7 @@ class Realization:
             dp_entry = {}
             for possib in tqdm(possibs_to, leave=False, desc=f"Segment {i + 1}/{len(possibs_to)}"):
                 best_cost = float('inf')
-                for segment_a_idx in range(i, max(-1, i-3), -1):
+                for segment_a_idx in range(i, max(-1, i-4), -1):
                     num_skips = i - segment_a_idx
                     segment_a = self._segmentList[segment_a_idx]
                     transition = SegmentTransition(segment_a, segment_b, self.rule_set)
@@ -642,7 +642,7 @@ class Realization:
 
                         transition_cost = transition.transitions_matrix[prev_possib][possib].get_cost()
                         local_cost_b = segment_b.get_cost(self.rule_set, possib)
-                        new_cost = prev_cost + (transition_cost + local_cost_b)
+                        new_cost = prev_cost + (num_skips+1)*(transition_cost + local_cost_b)
 
                         best_cost = min(new_cost, best_cost)
 
@@ -660,7 +660,7 @@ class Realization:
         i = len(self._segmentList)-2
         while i >= 0:
             segment_b = self._segmentList[i+1]
-            for segment_a_idx in range(i, max(-1, i-3), -1):
+            for segment_a_idx in range(i, max(-1, i-4), -1):
                 num_skips = i - segment_a_idx
                 segment_a = self._segmentList[segment_a_idx]
                 transition = SegmentTransition(segment_a, segment_b, self.rule_set)
@@ -668,10 +668,11 @@ class Realization:
                 for possib_a, prev_cost in dp[segment_a_idx].items():
                     to_possib_cost = transition.segment_b.get_cost(self.rule_set, best_possib)
                     transition_cost = transition.transitions_matrix[possib_a][best_possib].get_cost()
-                    if transition_cost + to_possib_cost == best_cost - prev_cost:
+                    if (num_skips+1) * (transition_cost + to_possib_cost) == best_cost - prev_cost:
                         best_possib = possib_a
                         best_cost = prev_cost
                         reverse_progression.append((best_possib, num_skips))
+                        logging.log(logging.INFO, f"Chose {best_possib} after skipping {num_skips} notes.")
                         i -= num_skips
                         found = True
                         break

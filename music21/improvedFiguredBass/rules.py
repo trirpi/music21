@@ -1,7 +1,7 @@
 import itertools
 import logging
 import math
-import unittest
+
 from abc import abstractmethod, ABC
 from functools import cache
 
@@ -11,7 +11,7 @@ from music21.note import Note
 
 
 class RuleSet:
-    MAX_SINGLE_POSSIB_COST = 10000
+    MAX_SINGLE_POSSIB_COST = 1000000
 
     MIN_INTERMEDIATE_NOTE = 10
 
@@ -32,11 +32,11 @@ class RuleSet:
         ]
 
         self.single_rules = [
-            VoiceCrossing(cost=float('inf')),
+            # VoiceCrossing(cost=float('inf')),
             HasDuplicate(cost=float('inf')),
             LimitPartToPitch(cost=5),
             NoSmallSecondInterval(cost=float('inf')),
-            IsIncomplete(cost=6),
+            IsIncomplete(cost=conf.highPriorityRuleCost),
             UpperPartsWithinLimit(cost=2 * conf.highPriorityRuleCost),
             IsPlayable(cost=float('inf')),
             PitchesWithinLimit(cost=float('inf')),
@@ -48,9 +48,10 @@ class RuleSet:
         ]
 
         self.intermediate_rules = [
-            IsConnected(5*conf.highPriorityRuleCost),
-            IsFast(5*conf.highPriorityRuleCost),
-            HasAnnotation(conf.highPriorityRuleCost),
+            IsConnected(2*conf.highPriorityRuleCost),
+            IsFast(2*conf.highPriorityRuleCost),
+            HasAnnotation(5*conf.highPriorityRuleCost),
+            IsAccented(2*conf.highPriorityRuleCost),
         ]
 
     def get_rules(self):
@@ -71,10 +72,7 @@ class RuleSet:
                 logging.log(logging.INFO, f"Cost += {cost} due to {rule.__class__.__name__}")
             total_cost += cost
             if total_cost == float('inf'): return total_cost
-        return int(1000*total_cost)/1000
-
-    def get_no_skip_cost(self, prev, curr, next_, annotation):
-        return max(sum([rule.get_cost(prev, curr, next_, annotation) for rule in self.intermediate_rules]), 0)
+        return int(100*total_cost)
 
 
 class Rule(ABC):
@@ -142,7 +140,6 @@ class Rule(ABC):
     @staticmethod
     def distance_between(part_a, part_b):
         return math.ceil(max(abs(part_a.ps - part_b.ps) / 2 - 1, 0))
-
 
 
 class ParallelFifths(Rule):
@@ -687,6 +684,7 @@ class CounterMovement(Rule):
             return 0
         return self.cost
 
+
 class SingleRule(ABC):
     def __init__(self, cost):
         self.cost = cost
@@ -956,7 +954,7 @@ class IsFast(IntermediateNoteRule):
             total += 3*self.cost
         elif note.quarterLength <= 0.5:
             total += self.cost
-        return total
+        return total - self.cost
 
 
 class IsConnected(IntermediateNoteRule):
@@ -966,7 +964,7 @@ class IsConnected(IntermediateNoteRule):
             total += self.cost
         if next_ is not None and self.is_connected(next_.pitch, note.pitch):
             total += self.cost
-        return total
+        return total - self.cost
 
     def is_connected(self, p1, p2):
         return abs(p1.ps - p2.ps) <= 2
@@ -974,10 +972,16 @@ class IsConnected(IntermediateNoteRule):
 
 class HasAnnotation(IntermediateNoteRule):
     def get_cost_intermediate(self, previous: Note, note: Note, next_: Note, annotation):
-        return 0 if annotation else self.cost
+        return -self.cost if annotation else self.cost
 
-# HELPER METHODS
-# --------------
+
+class IsAccented(IntermediateNoteRule):
+    def get_cost(self, possib_a, context):
+        curr = context['segment']
+        return -self.cost if curr.on_beat else self.cost
+
+    def get_cost_intermediate(self, previous: Note, note: Note, next_: Note, annotation):
+        assert False, "Should not be called."
 
 
 def partPairs(possibA, possibB):
@@ -1002,13 +1006,3 @@ def partPairs(possibA, possibB):
 
     '''
     return list(zip(possibA, possibB))
-
-
-class Test(unittest.TestCase):
-    pass
-
-
-if __name__ == '__main__':
-    import music21
-
-    music21.mainTest(Test)
