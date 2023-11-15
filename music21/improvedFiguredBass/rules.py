@@ -502,9 +502,14 @@ class VoiceOverlap(TransitionRule):
 
 class MinimizeMovementsMiddleVoices(TransitionRule):
     def get_cost(self, possib_a, possib_b, segment_a, segment_b):
+        return self.get_cached_cost(possib_a, possib_b)
+
+    @cache
+    def get_cached_cost(self, possib_a, possib_b):
         pairs = self.get_pairs(possib_a, possib_b)
         diff = sum([self.distance_between(a, b) for a, b in pairs])
-        if diff == 0 and self.cost == float('inf'): return 0
+        if diff == 0 and self.cost == float('inf'):
+            return 0
         return self.cost * diff / max(len(possib_a), len(possib_b))
 
 
