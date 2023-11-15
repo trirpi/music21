@@ -6,6 +6,7 @@ from abc import abstractmethod, ABC
 from functools import cache
 
 from music21 import voiceLeading, pitch
+from music21.improvedFiguredBass.helpers import format_possibility
 from music21.improvedFiguredBass.rules_config import RulesConfig
 from music21.note import Note
 
@@ -57,30 +58,51 @@ class RuleSet:
     def get_rules(self):
         return self.rules
 
-    def get_cost(self, possib_a, possib_b=None, context=None, enable_logging=False):
-        total_cost = 0
-        if possib_b is None:
+    @cache
+    def get_cost(self, possib_a, segment_a, possib_b=None, segment_b=None, enable_logging=False, rules=None):
+        if rules is None and possib_b is None:
             rules = self.single_rules + self.intermediate_rules
-        else:
+        elif rules is None:
             rules = self.rules
+
+        total_cost = 0
         for rule in rules:
             if possib_b is not None:
-                cost = rule.get_cost(possib_a, possib_b, context)
+                cost = rule.get_int_cost(possib_a, possib_b, segment_a, segment_b)
             else:
-                cost = rule.get_cost(possib_a, context)
-            if enable_logging and cost > 0:
+                cost = rule.get_int_cost(possib_a, segment_a)
+            if enable_logging and cost != 0:
                 logging.log(logging.INFO, f"Cost += {cost} due to {rule.__class__.__name__}")
             total_cost += cost
-            if total_cost == float('inf'): return total_cost
-        return int(100*total_cost)
+
+        if enable_logging and possib_b:
+            logging.log(
+                logging.INFO,
+                f"Transition cost {format_possibility(possib_a)} -> {format_possibility(possib_b)}: {total_cost}."
+            )
+        elif enable_logging and not possib_b:
+            logging.log(logging.INFO, f"Local cost {format_possibility(possib_a)}: {total_cost}.")
+        return total_cost
 
 
 class Rule(ABC):
     def __init__(self, cost):
         self.cost = cost
 
+    def get_int_cost(self, *args, **kwargs):
+        cost = self.get_cost(*args, **kwargs)
+        if cost == float('inf') or cost == -float('inf'):
+            return cost
+        return int(cost)
+
     @abstractmethod
-    def get_cost(self, possib_a, possib_b, context):
+    def get_cost(self, *args, **kwargs):
+        pass
+
+
+class TransitionRule(Rule):
+    @abstractmethod
+    def get_cost(self, possib_a, possib_b, segment_a, segment_b):
         pass
 
     @cache
@@ -142,9 +164,9 @@ class Rule(ABC):
         return math.ceil(max(abs(part_a.ps - part_b.ps) / 2 - 1, 0))
 
 
-class ParallelFifths(Rule):
+class ParallelFifths(TransitionRule):
 
-    def get_cost(self, possib_a, possib_b, _):
+    def get_cost(self, possib_a, possib_b, segment_a, segment_b):
         return self.cost if self.has_parallel_fifths(possib_a, possib_b) else 0
 
     @cache
@@ -171,8 +193,8 @@ class ParallelFifths(Rule):
         return has_parallel_fifths
 
 
-class ParallelOctaves(Rule):
-    def get_cost(self, possib_a, possib_b, _):
+class ParallelOctaves(TransitionRule):
+    def get_cost(self, possib_a, possib_b, segment_a, segment_b):
         return self.cost if self.has_parallel_octaves(possib_a, possib_b) else 0
 
     @cache
@@ -251,9 +273,9 @@ class ParallelOctaves(Rule):
         return hasParallelOctaves
 
 
-class HiddenFifth(Rule):
+class HiddenFifth(TransitionRule):
 
-    def get_cost(self, possib_a, possib_b, _):
+    def get_cost(self, possib_a, possib_b, segment_a, segment_b):
         return self.cost if self.has_hidden_fifth(possib_a, possib_b) else 0
 
     @cache
@@ -327,8 +349,8 @@ class HiddenFifth(Rule):
         return hasHiddenFifth
 
 
-class HiddenOctave(Rule):
-    def get_cost(self, possib_a, possib_b, _):
+class HiddenOctave(TransitionRule):
+    def get_cost(self, possib_a, possib_b, segment_a, segment_b):
         return self.cost if self.has_hidden_octave(possib_a, possib_b) else 0
 
     @cache
@@ -390,8 +412,8 @@ class HiddenOctave(Rule):
         return hasHiddenOctave
 
 
-class VoiceOverlap(Rule):
-    def get_cost(self, possib_a, possib_b, _):
+class VoiceOverlap(TransitionRule):
+    def get_cost(self, possib_a, possib_b, segment_a, segment_b):
         return self.cost if self.has_voice_overlap(possib_a, possib_b) else 0
 
     @cache
@@ -447,9 +469,9 @@ class VoiceOverlap(Rule):
         >>> possibB1 = (F4, F4, D4, D4)
         >>> possibility.voiceOverlap(possibA1, possibB1)
         True
-        >>> possibility.voiceCrossing(possibA1)
+        >>> possibility.voice_crossing(possibA1)
         False
-        >>> possibility.voiceCrossing(possibB1)
+        >>> possibility.voice_crossing(possibB1)
         False
 
 
@@ -478,16 +500,16 @@ class VoiceOverlap(Rule):
         return hasVoiceOverlap
 
 
-class MinimizeMovementsMiddleVoices(Rule):
-    def get_cost(self, possib_a, possib_b, context=None):
+class MinimizeMovementsMiddleVoices(TransitionRule):
+    def get_cost(self, possib_a, possib_b, segment_a, segment_b):
         pairs = self.get_pairs(possib_a, possib_b)
         diff = sum([self.distance_between(a, b) for a, b in pairs])
         if diff == 0 and self.cost == float('inf'): return 0
         return self.cost * diff / max(len(possib_a), len(possib_b))
 
 
-class MinimizeMovementsSopranoVoice(Rule):
-    def get_cost(self, possib_a, possib_b, context):
+class MinimizeMovementsSopranoVoice(TransitionRule):
+    def get_cost(self, possib_a, possib_b, segment_a, segment_b):
         diff = self.distance_between(possib_a[0], possib_b[0])
         if diff == 0 and self.cost == float('inf'):
             return 0
@@ -499,12 +521,12 @@ class MinimizeMovementsSopranoVoice(Rule):
         return abs(part_a.ps - part_b.ps)
 
 
-class PartMovementsWithinLimits(Rule):
+class PartMovementsWithinLimits(TransitionRule):
     def __init__(self, cost, limits):
         super().__init__(cost)
         self.limits = limits
 
-    def get_cost(self, possib_a, possib_b, _):
+    def get_cost(self, possib_a, possib_b, segment_a, segment_b):
         return self.cost if not self.part_movements_within_limits(possib_a, possib_b) else 0
 
     @cache
@@ -557,8 +579,8 @@ class PartMovementsWithinLimits(Rule):
         return withinLimits
 
 
-class UpperPartsSame(Rule):
-    def get_cost(self, possib_a, possib_b, _):
+class UpperPartsSame(TransitionRule):
+    def get_cost(self, possib_a, possib_b, segment_a, segment_b):
         return self.cost if not self.upper_parts_same(possib_a, possib_b) else 0
 
     @cache
@@ -592,12 +614,12 @@ class UpperPartsSame(Rule):
         return True
 
 
-class PartsSame(Rule):
+class PartsSame(TransitionRule):
     def __init__(self, cost, parts_to_check):
         super().__init__(cost)
         self.parts_to_check = parts_to_check
 
-    def get_cost(self, possib_a, possib_b, _):
+    def get_cost(self, possib_a, possib_b, segment_a, segment_b):
         return self.cost if not self.are_parts_same(possib_a, possib_b) else 0
 
     @cache
@@ -630,36 +652,15 @@ class PartsSame(Rule):
         return True
 
 
-class UnpreparedNote(Rule):
-    def get_cost(self, possib_a, possib_b, context):
-        segment_b = context['segment_b']
+class UnpreparedNote(TransitionRule):
+    def get_cost(self, possib_a, possib_b, segment_a, segment_b):
         return self.cost if self.has_unprepared_note(possib_a, possib_b, segment_b) else 0
 
     @cache
-    def has_unprepared_note(self, possibA, possibB, segmentB):
-        '''
-        >>> from music21.improvedFiguredBass import segment
-        >>> C = pitch.Pitch("C3")
-        >>> E = pitch.Pitch("E3")
-        >>> F = pitch.Pitch("F3")
-        >>> G = pitch.Pitch("G3")
-        >>> A = pitch.Pitch("A3")
-        >>> B = pitch.Pitch("B3")
-        >>> Ch = pitch.Pitch("C4")
-        >>> Eh = pitch.Pitch("E4")
-        >>> Fh = pitch.Pitch("F4")
-        >>> possibAPrepared = (Eh, B, G, E)
-        >>> possibAUnprepared = (Fh, Ch, A, F)
-        >>> possibB = (B, G, E, C)
-        >>> segmentB = segment.Segment(notationString='7')
-        >>> hasUnpreparedNote(possibAUnprepared, possibB, segmentB)
-        True
-        >>> hasUnpreparedNote(possibAPrepared, possibB, segmentB)
-        False
-        '''
+    def has_unprepared_note(self, possib_a, possib_b, segment_b):
         seventh = None
         ninth = None
-        for segmentChord in segmentB.segmentChord:
+        for segmentChord in segment_b.segmentChord:
             pos = segmentChord.getChordStep(7)
             if pos:
                 seventh = pos
@@ -667,49 +668,46 @@ class UnpreparedNote(Rule):
             if pos:
                 ninth = pos
         if seventh is not None:
-            for n2 in possibB:
-                if n2.pitchClass == seventh.pitchClass and n2 not in possibA:
+            for n2 in possib_b:
+                if n2.pitchClass == seventh.pitchClass and n2 not in possib_a:
                     return True
 
         if ninth is not None:
-            for n2 in possibB:
-                if n2.pitchClass == ninth.pitchClass and n2 not in possibA:
+            for n2 in possib_b:
+                if n2.pitchClass == ninth.pitchClass and n2 not in possib_a:
                     return True
         return False
 
 
-class CounterMovement(Rule):
-    def get_cost(self, possib_a, possib_b, context):
+class CounterMovement(TransitionRule):
+    def get_cost(self, possib_a, possib_b, segment_a, segment_b):
         if possib_a[0] > possib_b[0] and possib_a[-1] < possib_b[-1]:
             return 0
         return self.cost
 
 
-class SingleRule(ABC):
-    def __init__(self, cost):
-        self.cost = cost
-
+class SingleRule(Rule):
     @abstractmethod
-    def get_cost(self, possib_a, context):
+    def get_cost(self, possib, segment):
         pass
 
 
 class AvoidSeventhChord(SingleRule):
-    def get_cost(self, possib_a, context):
-        segment = context['segment']
+    def get_cost(self, possib, segment):
         if len(segment.segmentChord) <= 1:
             return 0
         classes = [p.pitchClass for p in segment.segmentChord[0].pitches]
-        for pitch in possib_a:
+        for pitch in possib:
             if pitch.pitchClass not in classes:
                 return self.cost
         return 0
 
 
 class IsPlayable(SingleRule):
-    def get_cost(self, possib_a, context):
-        return self.cost if not self.is_playable(possib_a) else 0
+    def get_cost(self, possib, segment):
+        return self.cost if not self.is_playable(possib) else 0
 
+    @cache
     def is_playable(self, possib_a):
         if len(possib_a) < 5:
             return self.playable_by_one_hand(possib_a[:-1])
@@ -722,24 +720,24 @@ class IsPlayable(SingleRule):
 
 
 class NoSmallSecondInterval(SingleRule):
-    def get_cost(self, possib_a, context):
-        for i in range(len(possib_a) - 1):
-            p1 = possib_a[i]
-            p2 = possib_a[i + 1]
+    def get_cost(self, possib, segment):
+        for i in range(len(possib) - 1):
+            p1 = possib[i]
+            p2 = possib[i + 1]
             if p1.ps - p2.ps <= 1:
                 return self.cost
         return 0
 
 
 class VoiceCrossing(SingleRule):
-    def get_cost(self, possib_a, context):
-        return self.cost if self.voiceCrossing(possib_a) else 0
+    def get_cost(self, possib, segment):
+        return self.cost if self.voice_crossing(possib) else 0
 
-    def voiceCrossing(self, possibA):
-        for part1Index in range(len(possibA)):
-            higherPitch = possibA[part1Index]
-            for part2Index in range(part1Index + 1, len(possibA)):
-                lowerPitch = possibA[part2Index]
+    def voice_crossing(self, possib_a):
+        for part1Index in range(len(possib_a)):
+            higherPitch = possib_a[part1Index]
+            for part2Index in range(part1Index + 1, len(possib_a)):
+                lowerPitch = possib_a[part2Index]
                 if higherPitch < lowerPitch:
                     return True
 
@@ -747,16 +745,16 @@ class VoiceCrossing(SingleRule):
 
 
 class HasDuplicate(SingleRule):
-    def get_cost(self, possib_a, context):
-        return self.cost if len(possib_a) != len(set(possib_a)) else 0
+    def get_cost(self, possib, segment):
+        return self.cost if len(possib) != len(set(possib)) else 0
 
 
 class IsIncomplete(SingleRule):
-    def get_cost(self, possib_a, context):
-        needed_pitch_names = context['segment'].pitchNamesInChord
-        melody_notes = context['segment'].melody_notes
+    def get_cost(self, possib, segment):
+        needed_pitch_names = segment.pitchNamesInChord
+        melody_notes = segment.melody_notes
         for pitch_names in needed_pitch_names:
-            if not self.isIncomplete(possib_a, pitch_names.copy(), melody_notes):
+            if not self.isIncomplete(possib, pitch_names.copy(), melody_notes):
                 return 0
         return self.cost
 
@@ -781,8 +779,8 @@ class IsIncomplete(SingleRule):
 
 
 class UpperPartsWithinLimit(SingleRule):
-    def get_cost(self, possib_a, context):
-        return self.cost if not self.upperPartsWithinLimit(possib_a) else 0
+    def get_cost(self, possib, segment):
+        return self.cost if not self.upperPartsWithinLimit(possib) else 0
 
     def upperPartsWithinLimit(self, possibA, maxSemitoneSeparation=12):
         '''
@@ -821,16 +819,16 @@ class UpperPartsWithinLimit(SingleRule):
 
 
 class PitchesUnderMelody(SingleRule):
-    def get_cost(self, possib_a, context):
-        melody_notes = context['segment'].melody_notes
+    def get_cost(self, possib, segment):
+        melody_notes = segment.melody_notes
         if not melody_notes:
             return 0
-        return max(0, self.cost * (possib_a[0].ps - min([note.pitch.ps for note in melody_notes])))
+        return max(0, self.cost * (possib[0].ps - min([note.pitch.ps for note in melody_notes])))
 
 
 class PitchesWithinLimit(SingleRule):
-    def get_cost(self, possib_a, context):
-        return self.cost if not self.pitchesWithinLimit(possib_a) else 0
+    def get_cost(self, possib, segment):
+        return self.cost if not self.pitchesWithinLimit(possib) else 0
 
     def pitchesWithinLimit(self, possibA, maxPitch=pitch.Pitch('B5'), minRightHandPitch=pitch.Pitch('A3')):
         '''
@@ -873,8 +871,8 @@ class PitchesWithinLimit(SingleRule):
 
 
 class LimitPartToPitch(SingleRule):
-    def get_cost(self, possib_a, context):
-        return self.cost if not self.limitPartToPitch(possib_a) else 0
+    def get_cost(self, possib, segment):
+        return self.cost if not self.limitPartToPitch(possib) else 0
 
     def limitPartToPitch(self, possibA, partPitchLimits=None):
         '''
@@ -906,7 +904,7 @@ class LimitPartToPitch(SingleRule):
 
 
 class NotTooLow(SingleRule):
-    def get_cost(self, possib, context):
+    def get_cost(self, possib, segment):
         bass_note = possib[-1]
         if bass_note <= pitch.Pitch("C3") and possib[-2].ps - bass_note.ps < 7:
             return self.cost
@@ -914,8 +912,7 @@ class NotTooLow(SingleRule):
 
 
 class ContainRoot(SingleRule):
-    def get_cost(self, possib, context):
-        segment = context['segment']
+    def get_cost(self, possib, segment):
         root = segment.segmentChord[0].root()
         for p in possib:
             if (p.ps - root.ps) % 12 == 0:
@@ -924,19 +921,18 @@ class ContainRoot(SingleRule):
 
 
 class LessNotes(SingleRule):
-    def get_cost(self, possib_a, context):
-        return max(0, (len(possib_a) - 2)) * self.cost
+    def get_cost(self, possib, segment):
+        return max(0, (len(possib) - 2)) * self.cost
 
 
 class IntermediateNoteRule(SingleRule):
     def __init__(self, cost):
         super().__init__(cost)
 
-    def get_cost(self, possib_a, context):
-        curr = context['segment']
-        prev = None if curr.prev_segment is None else curr.prev_segment.bassNote
-        next_ = None if curr.next_segment is None else curr.next_segment.bassNote
-        return self.get_cost_intermediate(prev, curr.bassNote, next_, curr.notation_string)
+    def get_cost(self, possib, segment):
+        prev = None if segment.prev_segment is None else segment.prev_segment.bassNote
+        next_ = None if segment.next_segment is None else segment.next_segment.bassNote
+        return self.get_cost_intermediate(prev, segment.bassNote, next_, segment.notation_string)
 
     @abstractmethod
     def get_cost_intermediate(self, previous: Note, note: Note, next_: Note, annotation):
@@ -946,7 +942,7 @@ class IntermediateNoteRule(SingleRule):
 class IsFast(IntermediateNoteRule):
     def get_cost_intermediate(self, previous: Note | None, note: Note, next_: Note | None, annotation):
         total = 0
-        if previous is None or next_ is None:
+        if previous is None:
             return 0
         if previous.duration.quarterLength == note.quarterLength == 0.5:
             total += 2*self.cost
@@ -954,7 +950,7 @@ class IsFast(IntermediateNoteRule):
             total += 3*self.cost
         elif note.quarterLength <= 0.5:
             total += self.cost
-        return total - self.cost
+        return total - 2*self.cost
 
 
 class IsConnected(IntermediateNoteRule):
@@ -976,9 +972,8 @@ class HasAnnotation(IntermediateNoteRule):
 
 
 class IsAccented(IntermediateNoteRule):
-    def get_cost(self, possib_a, context):
-        curr = context['segment']
-        return -self.cost if curr.on_beat else self.cost
+    def get_cost(self, possib, segment):
+        return -self.cost if segment.on_beat else self.cost
 
     def get_cost_intermediate(self, previous: Note, note: Note, next_: Note, annotation):
         assert False, "Should not be called."

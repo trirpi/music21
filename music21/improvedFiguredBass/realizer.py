@@ -64,10 +64,8 @@ from music21.improvedFiguredBass import rules_config
 from music21.improvedFiguredBass import segment
 from music21.improvedFiguredBass.rules import RuleSet
 from music21.improvedFiguredBass.rules_config import RulesConfig
-from music21.improvedFiguredBass.transition import SegmentTransition, Transition
-
-if t.TYPE_CHECKING:
-    pass
+from music21.improvedFiguredBass.helpers import format_possibility
+from music21.improvedFiguredBass.transition import SegmentTransition
 
 
 def figuredBassFromStream(streamPart: stream.Stream) -> FiguredBassLine:
@@ -591,7 +589,6 @@ class Realization:
 
         self.keyboardStyleOutput = True
 
-        # self.purge_intermediate_notes()
         self._segment_transitions = None
 
     def purge_intermediate_notes(self):
@@ -632,7 +629,7 @@ class Realization:
             segment_b = self._segmentList[i+1]
             possibs_to = segment_b.all_filtered_possibilities(self.rule_set)
             dp_entry = {}
-            for possib in tqdm(possibs_to, leave=False, desc=f"Segment {i + 1}/{len(possibs_to)}"):
+            for possib in tqdm(possibs_to, leave=False, desc=f"Segment {i + 1}/{len(self._segmentList)}"):
                 best_cost = float('inf')
                 for segment_a_idx in range(i, max(-1, i-4), -1):
                     num_skips = i - segment_a_idx
@@ -672,7 +669,7 @@ class Realization:
                         best_possib = possib_a
                         best_cost = prev_cost
                         reverse_progression.append((best_possib, num_skips))
-                        logging.log(logging.INFO, f"Chose {best_possib} after skipping {num_skips} notes.")
+                        logging.log(logging.INFO, f"Chose {format_possibility(best_possib)} after skipping {num_skips} notes.")
                         i -= num_skips
                         found = True
                         break
@@ -682,45 +679,39 @@ class Realization:
             i -= 1
 
         # Delete skipped notes
-        current_idx = 0
+        curr_idx = 0
         result = []
-
         idx_to_delete = []
+        prev_segment = None
+        prev_val = None
+        measure = float('inf')
+        logging.log(logging.INFO, f"\n=== START LOG ========================\n")
         for val, num_skips in reversed(reverse_progression):
+            curr_segment = self._segmentList[curr_idx]
+            if (m := curr_segment.bassNote.measureNumber) < measure:
+                measure = m
+                logging.log(logging.INFO, f"### Measure {measure} ###")
+            if prev_val:
+                self.rule_set.get_cost(val, curr_segment, prev_val, prev_segment, enable_logging=True)
+
+            self.rule_set.get_cost(val, curr_segment, enable_logging=True)
             result.append(val)
-            for i in range(current_idx+1, current_idx+1+num_skips):
-                self._segmentList[current_idx].quarterLength += self._segmentList[i].quarterLength
+            for i in range(curr_idx+1, curr_idx+1+num_skips):
+                self._segmentList[curr_idx].quarterLength += self._segmentList[i].quarterLength
                 idx_to_delete.append(i)
-            current_idx += 1 + num_skips
+            curr_idx += 1 + num_skips
+            prev_segment = curr_segment
+            prev_val = val
 
         for i in reversed(idx_to_delete):
             del self._segmentList[i]
 
+        logging.log(logging.INFO, f"======================================")
         logging.log(logging.INFO, f"Found solution with cost {final_cost}.")
+        logging.log(logging.INFO, f"======================================")
 
         return result
 
-    def log_possibility_progression(self, progression):
-        def format_possibility(pos):
-            return '(' + ' '.join(p.nameWithOctave.ljust(3) for p in pos) + ')'
-
-        possib_b = progression[0]
-        segment_b = self._segmentList[0]
-        measure = segment_b.bassNote.measureNumber
-        logging.log(logging.INFO, f"### Measure {measure} ###")
-        logging.log(logging.INFO,
-                    f"Cost {format_possibility(progression[0])}: {segment_b.get_cost(self.rule_set, progression[0])}")
-        for i in range(1, len(self._segmentList)):   #, seg_transition in enumerate(self._segment_transitions):
-            segment_a = segment_b
-            segment_b = self._segmentList[i]
-            possib_a = possib_b
-            possib_b = progression[i]
-            seg_transition = SegmentTransition(segment_a, segment_b, self.rule_set)
-            transition = Transition(possib_a, possib_b, seg_transition)
-            if (m := segment_a.bassNote.measureNumber) > measure:
-                measure = m
-                logging.log(logging.INFO, f"### Measure {measure} ###")
-            transition.get_cost(enable_logging=True)
 
     def generateRealizationFromPossibilityProgression(self, possibilityProgression):
         '''
@@ -796,7 +787,6 @@ class Realization:
     def generate_optimal_realization(self):
         self.initialize_segment_transition()
         possibilityProgression = self.get_optimal_possibility_progression()
-        self.log_possibility_progression(possibilityProgression)
         return self.generateRealizationFromPossibilityProgression(possibilityProgression)
 
 

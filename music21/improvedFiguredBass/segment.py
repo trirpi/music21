@@ -477,18 +477,17 @@ class Segment:
                 result += list(itertools.product(*iterables))
         return result
 
-    def all_filtered_possibilities(self, rules: RuleSet):
+    def all_filtered_possibilities(self, rule_set: RuleSet):
         possibs = self.allSinglePossibilities()
         pairs = []
         for possib in possibs:
-            cost = self.get_cost(rules, possib)
-            if cost <= rules.MAX_SINGLE_POSSIB_COST:
+            cost = self.get_cost(rule_set, possib)
+            if cost <= rule_set.MAX_SINGLE_POSSIB_COST:
                 pairs.append(possib)
         return pairs
 
-    def get_cost(self, rules, possib):
-        ctx = {"segment": self}
-        return rules.get_cost(possib, context=ctx)
+    def get_cost(self, rul_set, possib):
+        return rul_set.get_cost(possib, self)
 
 
 # HELPER METHODS

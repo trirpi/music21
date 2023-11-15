@@ -25,8 +25,8 @@ class Transition:
     def get_cost(self, enable_logging=False):
         rule_set: RuleSet = self.segment_transition.rule_set
         if self.cost is None or enable_logging:
-            self.cost = rule_set.get_cost(self.possib_a, self.possib_b, {'segment_b': self.segment_b},
-                                 enable_logging=enable_logging)
+            self.cost = rule_set.get_cost(self.possib_a, self.segment_a, self.possib_b, self.segment_b,
+                                          enable_logging=enable_logging)
         return self.cost
 
     def __repr__(self):
