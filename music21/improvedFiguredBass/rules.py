@@ -107,7 +107,7 @@ class TransitionRule(Rule):
 
         pairs = [(possib_a[0], possib_b[0]), (possib_a[-1], possib_b[-1])]
 
-        # get match all pairs of A with closest to B injectively
+        # get all possible injective mappings
         middle_left = self._get_all_pair_possibs(possib_a[1:-1], possib_b[1:-1])
         possibs = []
         min_diff = float('inf')
