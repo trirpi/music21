@@ -23,7 +23,11 @@ class SkipRules:
         ]
 
     def should_skip(self, segment: 'Segment') -> SkipDecision:
-        if segment.notation_string or segment.duration.quarterLength >= 1 or segment.prev_segment is None:
+        if (segment.notation_string
+            or segment.duration.quarterLength >= 1
+            or segment.prev_segment is None
+            or segment.prev_segment.duration < segment.duration
+        ):
             return SkipDecision.NO_SKIP
 
         if sum(r.get_cost(segment) for r in self.rules) > self.MUST_SKIP_THRESHOLD:
