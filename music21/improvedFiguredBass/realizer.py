@@ -38,7 +38,6 @@ from music21 import key
 from music21 import meter
 from music21 import note
 from music21 import pitch
-from music21.stream.iterator import StreamIterator
 from music21.figuredBass import checker
 from music21.improvedFiguredBass import notation
 from music21.improvedFiguredBass import realizer_scale
@@ -48,8 +47,7 @@ from music21.improvedFiguredBass.rules import RuleSet
 from music21.improvedFiguredBass.skip_rules import SkipDecision
 
 
-def figured_bass_from_stream(stream_part: StreamIterator) -> FiguredBassLine:
-    stream_part = stream_part.stream()
+def figured_bass_from_stream(stream_part) -> FiguredBassLine:
     sf = stream_part.flatten()
     sfn = sf.getElementsByClass(note.Note)
     myKey: key.Key
