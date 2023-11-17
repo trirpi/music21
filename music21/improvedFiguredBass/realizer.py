@@ -192,20 +192,20 @@ def _trim_all_movements(segment_list):
 
 
 class FiguredBassLine:
-    def __init__(self, inKey=None, inTime=None):
-        if inKey is None:
-            inKey = key.Key('C')
-        if inTime is None:
-            inTime = meter.TimeSignature('4/4')
+    def __init__(self, in_key=None, in_time=None):
+        if in_key is None:
+            in_key = key.Key('C')
+        if in_time is None:
+            in_time = meter.TimeSignature('4/4')
 
-        self.inKey = inKey
-        self.inTime = inTime
+        self.inKey = in_key
+        self.inTime = in_time
         self._paddingLeft = 0.0
         self._overlaidParts = stream.Part()
-        self._fbScale = realizer_scale.FiguredBassScale(inKey.pitchFromDegree(1), inKey.mode)
+        self._fbScale = realizer_scale.FiguredBassScale(in_key.pitchFromDegree(1), in_key.mode)
         self._fbList = []
 
-    def add_element(self, bassObject: note.Note, notationString=None):
+    def add_element(self, bass_object: note.Note, notation_string=None):
         """
         Use this method to add (bassNote, notationString) pairs to the bass line. Elements
         are realized in the order they are added.
@@ -217,35 +217,26 @@ class FiguredBassLine:
         >>> fbLine.add_element(note.Note('C#3'), '6')
         >>> fbLine.add_element(note.Note('D#3'), '6')
         """
-        bassObject.editorial.notationString = notationString
-        c = bassObject.classes
+        bass_object.editorial.notationString = notation_string
+        c = bass_object.classes
         if 'Note' not in c:
             raise FiguredBassLineException(
-                f'Not a valid bassObject (only note.Note supported) was {bassObject!r}')
-        self._fbList.append((bassObject, notationString))  # a bass note, and a notationString
-        add_lyrics_to_bass_note(bassObject, notationString)
+                f'Not a valid bassObject (only note.Note supported) was {bass_object!r}')
+        self._fbList.append((bass_object, notation_string))  # a bass note, and a notationString
+        add_lyrics_to_bass_note(bass_object, notation_string)
 
     def generate_bass_line(self):
         bassLine = stream.Part()
         bassLine.append(clef.BassClef())
         bassLine.append(key.KeySignature(self.inKey.sharps))
         bassLine.append(copy.deepcopy(self.inTime))
-        r = None
-        if self._paddingLeft != 0.0:
-            r = note.Rest(quarterLength=self._paddingLeft)
-            bassLine.append(r)
 
         for (bassNote, unused_notationString) in self._fbList:
             bassLine.append(bassNote)
 
-        bl2 = bassLine.makeNotation(inPlace=False, cautionaryNotImmediateRepeat=False)
-        if r is not None:
-            m0 = bl2.getElementsByClass(stream.Measure).first()
-            m0.remove(m0.getElementsByClass(note.Rest).first())
-            m0.padAsAnacrusis()
-        return bl2
+        return bassLine
 
-    def retrieve_segments(self, fbRules=None, maxPitch=None):
+    def retrieve_segments(self, fb_rules=None, max_pitch=None):
         '''
         generates the segmentList from an fbList, including any overlaid Segments
 
@@ -253,10 +244,10 @@ class FiguredBassLine:
 
         if maxPitch is None, uses pitch.Pitch('B5')
         '''
-        if fbRules is None:
-            fbRules = rules_config.RulesConfig()
-        if maxPitch is None:
-            maxPitch = pitch.Pitch('B5')
+        if fb_rules is None:
+            fb_rules = rules_config.RulesConfig()
+        if max_pitch is None:
+            max_pitch = pitch.Pitch('B5')
         segmentList = []
         bassLine = self.generate_bass_line()
         if self._overlaidParts:
@@ -272,7 +263,7 @@ class FiguredBassLine:
         play_offsets = allKeys[0]
         previousSegment = segment.Segment(bassNote, bassNote.editorial.notationString,
                                           self._fbScale,
-                                          fbRules, maxPitch, play_offsets=play_offsets)
+                                          fb_rules, max_pitch, play_offsets=play_offsets)
         previousSegment.quarterLength = previousBassNote.quarterLength
         segmentList.append(previousSegment)
         for k in allKeys[1:]:
@@ -280,7 +271,7 @@ class FiguredBassLine:
             bassNote = currentMapping[k][-1]
             currentSegment = segment.Segment(bassNote, bassNote.editorial.notationString,
                                              self._fbScale,
-                                             fbRules, maxPitch, play_offsets=k)
+                                             fb_rules, max_pitch, play_offsets=k)
             for partNumber in range(1, len(currentMapping[k])):
                 upperPitch = currentMapping[k][partNumber - 1]
                 currentSegment.rules_config._partPitchLimits.append((partNumber, upperPitch))
@@ -485,17 +476,11 @@ class Realization:
 
         bassLine = stream.Part()
         bassLine.append([copy.deepcopy(self._keySig), copy.deepcopy(self._inTime)])
-        r = None
-        if self._paddingLeft != 0.0:
-            r = note.Rest(quarterLength=self._paddingLeft)
-            bassLine.append(copy.deepcopy(r))
 
         if self.keyboardStyleOutput:
             rightHand = stream.Part()
             sol.insert(0.0, rightHand)
             rightHand.append([copy.deepcopy(self._keySig), copy.deepcopy(self._inTime)])
-            if r is not None:
-                rightHand.append(copy.deepcopy(r))
 
             for segmentIndex in range(len(self.segment_list)):
                 possibA = possibility_progression[segmentIndex]
@@ -507,19 +492,12 @@ class Realization:
                 rightHand.append(rhChord)
             rightHand.insert(0.0, clef.TrebleClef())
 
-            rightHand.makeNotation(inPlace=True, cautionaryNotImmediateRepeat=False)
-            if r is not None:
-                rightHand[0].pop(3)
-                rightHand[0].padAsAnacrusis()
-
         else:  # Chorale-style output
             upperParts = []
             for partNumber in range(len(possibility_progression[0]) - 1):
                 fbPart = stream.Part()
                 sol.insert(0.0, fbPart)
                 fbPart.append([copy.deepcopy(self._keySig), copy.deepcopy(self._inTime)])
-                if r is not None:
-                    fbPart.append(copy.deepcopy(r))
                 upperParts.append(fbPart)
 
             for segmentIndex in range(len(self.segment_list)):
@@ -536,15 +514,9 @@ class Realization:
                 c = clef.bestClef(upperPart, allowTreble8vb=True, recurse=True)
                 upperPart.insert(0.0, c)
                 upperPart.makeNotation(inPlace=True, cautionaryNotImmediateRepeat=False)
-                if r is not None:
-                    upperPart[0].pop(3)
-                    upperPart[0].padAsAnacrusis()
 
         bassLine.insert(0.0, clef.BassClef())
         bassLine.makeNotation(inPlace=True, cautionaryNotImmediateRepeat=False)
-        if r is not None:
-            bassLine[0].pop(3)
-            bassLine[0].padAsAnacrusis()
         sol.insert(0.0, bassLine)
         return sol
 
