@@ -47,6 +47,7 @@ from music21.improvedFiguredBass import segment
 from music21.improvedFiguredBass.helpers import format_possibility
 from music21.improvedFiguredBass.rules import RuleSet
 from music21.improvedFiguredBass.rules_config import RulesConfig
+from music21.improvedFiguredBass.skip_rules import SkipDecision
 from music21.improvedFiguredBass.transition import SegmentTransition
 
 
@@ -202,7 +203,7 @@ class FiguredBassLine:
         self.inTime = inTime
         self._paddingLeft = 0.0
         self._overlaidParts = stream.Part()
-        self._fbScale = realizerScale.FiguredBassScale(inKey.pitchFromDegree(1), inKey.mode)
+        self._fbScale = realizer_scale.FiguredBassScale(inKey.pitchFromDegree(1), inKey.mode)
         self._fbList = []
 
     def add_element(self, bassObject: note.Note, notationString=None):
@@ -374,7 +375,7 @@ class Realization:
     def generate_dp_table(self):
         first_possibilities = self.segment_list[0].all_filtered_possibilities(self.rule_set)
 
-        dp = [  # (possibility, cost) dicts for each segment index i
+        dp: list[dict] = [  # (possibility, cost) dicts for each segment index i
             {possib: self.segment_list[0].get_cost(self.rule_set, possib) for possib in first_possibilities}
         ]
 
@@ -387,6 +388,9 @@ class Realization:
                 for segment_a_idx in range(i, max(-1, i-4), -1):
                     num_skips = i - segment_a_idx
                     segment_a = self.segment_list[segment_a_idx]
+                    skip_decision = self.rule_set.should_skip(segment_a)
+                    if skip_decision == SkipDecision.SKIP:
+                        continue
                     transition = SegmentTransition(segment_a, segment_b, self.rule_set)
                     for prev_possib, prev_cost in dp[segment_a_idx].items():
 
@@ -395,6 +399,8 @@ class Realization:
                         new_cost = prev_cost + (num_skips+1)*(transition_cost + local_cost_b)
 
                         best_cost = min(new_cost, best_cost)
+                    if skip_decision == SkipDecision.NO_SKIP:
+                        break
 
                 dp_entry[possib] = best_cost
             dp.append(dp_entry)

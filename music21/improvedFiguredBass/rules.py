@@ -8,17 +8,13 @@ from functools import cache
 from music21 import voiceLeading, pitch
 from music21.improvedFiguredBass.helpers import format_possibility
 from music21.improvedFiguredBass.rules_config import RulesConfig
-from music21.improvedFiguredBass.segment import Segment
-from music21.improvedFiguredBass.skip_decision import SkipDecision
+from music21.improvedFiguredBass.skip_rules import SkipDecision
 
 from music21.improvedFiguredBass.skip_rules import SkipRules
-from music21.note import Note
 
 
 class RuleSet:
     MAX_SINGLE_POSSIB_COST = 1000000
-
-    MIN_INTERMEDIATE_NOTE = 10
 
     def __init__(self, conf: RulesConfig):
         self.config = conf
@@ -29,7 +25,7 @@ class RuleSet:
             HiddenFifth(cost=conf.lowPriorityRuleCost),
             HiddenOctave(cost=conf.lowPriorityRuleCost),
             VoiceOverlap(cost=conf.highPriorityRuleCost),
-            #             # UpperPartsSame(cost=conf.lowPriorityRuleCost),
+            # UpperPartsSame(cost=conf.lowPriorityRuleCost),
             MinimizeMovementsMiddleVoices(cost=conf.lowPriorityRuleCost),
             MinimizeMovementsSopranoVoice(cost=conf.highPriorityRuleCost),
             UnpreparedNote(cost=conf.lowPriorityRuleCost),
@@ -77,7 +73,7 @@ class RuleSet:
             logging.log(logging.INFO, f"Local cost {format_possibility(possib_a)}: {total_cost}.")
         return total_cost
 
-    def should_skip(self, segment: Segment) -> SkipDecision:
+    def should_skip(self, segment: 'Segment') -> SkipDecision:
         return self.skip_rules.should_skip(segment)
 
 

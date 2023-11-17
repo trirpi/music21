@@ -65,7 +65,7 @@ class Segment:
     def __init__(self,
                  bassNote: str | note.Note = 'C3',
                  notationString: str | None = None,
-                 fbScale: realizer_scale.FiguredBassScale = realizerScale.FiguredBassScale(),
+                 fbScale: realizer_scale.FiguredBassScale = realizer_scale.FiguredBassScale(),
                  rules_config: RulesConfig | None = None,
                  maxPitch: str | pitch.Pitch = 'B5',
                  listOfPitches=None,

@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
 from enum import Enum
+from typing import TYPE_CHECKING
 
-from music21.improvedFiguredBass.segment import Segment
+if TYPE_CHECKING:
+    from music21.improvedFiguredBass.segment import Segment
 
 
 class SkipDecision(Enum):
@@ -20,8 +22,8 @@ class SkipRules:
             IsAccented(10),
         ]
 
-    def should_skip(self, segment: Segment) -> SkipDecision:
-        if segment.notation_string or segment.duration >= 1 or segment.prev_segment is None:
+    def should_skip(self, segment: 'Segment') -> SkipDecision:
+        if segment.notation_string or segment.duration.quarterLength >= 1 or segment.prev_segment is None:
             return SkipDecision.NO_SKIP
 
         if sum(r.get_cost(segment) for r in self.rules) > self.MUST_SKIP_THRESHOLD:
@@ -35,12 +37,12 @@ class IntermediateNoteRule(ABC):
         self.cost = cost
 
     @abstractmethod
-    def get_cost(self, segment: Segment) -> int:
+    def get_cost(self, segment: 'Segment') -> int:
         pass
 
 
 class IsFast(IntermediateNoteRule):
-    def get_cost(self, segment: Segment) -> int:
+    def get_cost(self, segment: 'Segment') -> int:
         previous = segment.prev_segment
         note = segment.bassNote
 
@@ -57,8 +59,8 @@ class IsFast(IntermediateNoteRule):
 
 
 class IsConnected(IntermediateNoteRule):
-    def get_cost(self, segment: Segment) -> int:
-        previous, next_ = segment.prev_segment, segment.next_segment
+    def get_cost(self, segment: 'Segment') -> int:
+        previous, next_ = segment.prev_segment.bassNote, segment.next_segment.bassNote
         note = segment.bassNote
         total = 0
         if previous is not None and self.is_connected(previous.pitch, note.pitch):
@@ -73,5 +75,5 @@ class IsConnected(IntermediateNoteRule):
 
 
 class IsAccented(IntermediateNoteRule):
-    def get_cost(self, segment: Segment) -> int:
+    def get_cost(self, segment: 'Segment') -> int:
         return self.cost * (not segment.on_beat)
