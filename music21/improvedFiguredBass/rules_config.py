@@ -166,6 +166,7 @@ class RulesConfig(prebase.ProtoM21Object):
         self.upperPartsMaxSemitoneSeparation = 12
         self.forbidVoiceCrossing = True
 
+        self.largestRuleCost = 10e4
         self.highPriorityRuleCost = 1600
         self.mediumPriorityRuleCost = 800
         self.lowPriorityRuleCost = 400

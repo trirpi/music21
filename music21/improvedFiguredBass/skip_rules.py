@@ -13,13 +13,13 @@ class SkipDecision(Enum):
 
 
 class SkipRules:
-    MUST_SKIP_THRESHOLD = 10
+    MUST_SKIP_THRESHOLD = 20
 
     def __init__(self):
         self.rules = [
             IsConnected(5),
             IsFast(5),
-            IsAccented(10),
+            IsAccented(5),
         ]
 
     def should_skip(self, segment: 'Segment') -> SkipDecision:

@@ -4,17 +4,19 @@ import math
 
 from abc import abstractmethod, ABC
 from functools import cache
+from typing import TYPE_CHECKING
 
 from music21 import voiceLeading, pitch
 from music21.improvedFiguredBass.possibility import Possibility
 from music21.improvedFiguredBass.rules_config import RulesConfig
-from music21.improvedFiguredBass.skip_rules import SkipDecision
+from music21.improvedFiguredBass.skip_rules import SkipDecision, SkipRules
 
-from music21.improvedFiguredBass.skip_rules import SkipRules
+if TYPE_CHECKING:
+    from music21.improvedFiguredBass.segment import Segment
 
 
 class RuleSet:
-    MAX_SINGLE_POSSIB_COST = 1000000
+    MAX_SINGLE_POSSIB_COST = 10e10
 
     def __init__(self, conf: RulesConfig):
         self.config = conf
