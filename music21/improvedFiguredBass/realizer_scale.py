@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # ------------------------------------------------------------------------------
-# Name:         realizerScale.py
+# Name:         realizer_scale.py
 # Purpose:      a figured bass scale
 # Authors:      Jose Cabal-Ugaz
 #

@@ -8,6 +8,10 @@ from functools import cache
 from music21 import voiceLeading, pitch
 from music21.improvedFiguredBass.helpers import format_possibility
 from music21.improvedFiguredBass.rules_config import RulesConfig
+from music21.improvedFiguredBass.segment import Segment
+from music21.improvedFiguredBass.skip_decision import SkipDecision
+
+from music21.improvedFiguredBass.skip_rules import SkipRules
 from music21.note import Note
 
 
@@ -48,22 +52,12 @@ class RuleSet:
             LessNotes(cost=conf.lowPriorityRuleCost),
         ]
 
-        self.intermediate_rules = [
-            IsConnected(5*conf.highPriorityRuleCost),
-            IsFast(5*conf.highPriorityRuleCost),
-            HasAnnotation(5*conf.highPriorityRuleCost),
-            IsAccented(10*conf.highPriorityRuleCost),
-        ]
-
-    def get_rules(self):
-        return self.rules
+        self.skip_rules = SkipRules()
 
     @cache
     def get_cost(self, possib_a, segment_a, possib_b=None, segment_b=None, enable_logging=False, rules=None):
-        if rules is None and possib_b is None:
-            rules = self.single_rules + self.intermediate_rules
-        elif rules is None:
-            rules = self.rules
+        if rules is None:
+            rules = self.rules if possib_b else self.single_rules
 
         total_cost = 0
         for rule in rules:
@@ -83,6 +77,9 @@ class RuleSet:
         elif enable_logging and not possib_b:
             logging.log(logging.INFO, f"Local cost {format_possibility(possib_a)}: {total_cost}.")
         return total_cost
+
+    def should_skip(self, segment: Segment) -> SkipDecision:
+        return self.skip_rules.should_skip(segment)
 
 
 class Rule(ABC):
@@ -928,60 +925,6 @@ class ContainRoot(SingleRule):
 class LessNotes(SingleRule):
     def get_cost(self, possib, segment):
         return max(0, (len(possib) - 2)) * self.cost
-
-
-class IntermediateNoteRule(SingleRule):
-    def __init__(self, cost):
-        super().__init__(cost)
-
-    def get_cost(self, possib, segment):
-        prev = None if segment.prev_segment is None else segment.prev_segment.bassNote
-        next_ = None if segment.next_segment is None else segment.next_segment.bassNote
-        return self.get_cost_intermediate(prev, segment.bassNote, next_, segment.notation_string)
-
-    @abstractmethod
-    def get_cost_intermediate(self, previous: Note, note: Note, next_: Note, annotation):
-        pass
-
-
-class IsFast(IntermediateNoteRule):
-    def get_cost_intermediate(self, previous: Note | None, note: Note, next_: Note | None, annotation):
-        total = 0
-        if previous is None:
-            return 0
-        if previous.duration.quarterLength == note.quarterLength == 0.5:
-            total += 2*self.cost
-        elif previous.duration.quarterLength == note.quarterLength < 0.5:
-            total += 3*self.cost
-        elif note.quarterLength <= 0.5:
-            total += self.cost
-        return total - 2*self.cost
-
-
-class IsConnected(IntermediateNoteRule):
-    def get_cost_intermediate(self, previous: Note | None, note: Note, next_: Note | None, annotation):
-        total = 0
-        if previous is not None and self.is_connected(previous.pitch, note.pitch):
-            total += self.cost
-        if next_ is not None and self.is_connected(next_.pitch, note.pitch):
-            total += self.cost
-        return total - self.cost
-
-    def is_connected(self, p1, p2):
-        return abs(p1.ps - p2.ps) <= 2
-
-
-class HasAnnotation(IntermediateNoteRule):
-    def get_cost_intermediate(self, previous: Note, note: Note, next_: Note, annotation):
-        return -self.cost if annotation else 0
-
-
-class IsAccented(IntermediateNoteRule):
-    def get_cost(self, possib, segment):
-        return -self.cost if segment.on_beat else self.cost
-
-    def get_cost_intermediate(self, previous: Note, note: Note, next_: Note, annotation):
-        assert False, "Should not be called."
 
 
 def partPairs(possibA, possibB):

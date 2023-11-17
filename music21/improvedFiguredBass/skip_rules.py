@@ -1,0 +1,77 @@
+from abc import ABC, abstractmethod
+from enum import Enum
+
+from music21.improvedFiguredBass.segment import Segment
+
+
+class SkipDecision(Enum):
+    UNKNOWN = 0
+    SKIP = 1
+    NO_SKIP = 2
+
+
+class SkipRules:
+    MUST_SKIP_THRESHOLD = 10
+
+    def __init__(self):
+        self.rules = [
+            IsConnected(5),
+            IsFast(5),
+            IsAccented(10),
+        ]
+
+    def should_skip(self, segment: Segment) -> SkipDecision:
+        if segment.notation_string or segment.duration >= 1 or segment.prev_segment is None:
+            return SkipDecision.NO_SKIP
+
+        if sum(r.get_cost(segment) for r in self.rules) > self.MUST_SKIP_THRESHOLD:
+            return SkipDecision.SKIP
+
+        return SkipDecision.UNKNOWN
+
+
+class IntermediateNoteRule(ABC):
+    def __init__(self, cost):
+        self.cost = cost
+
+    @abstractmethod
+    def get_cost(self, segment: Segment) -> int:
+        pass
+
+
+class IsFast(IntermediateNoteRule):
+    def get_cost(self, segment: Segment) -> int:
+        previous = segment.prev_segment
+        note = segment.bassNote
+
+        total = 0
+        if previous is None:
+            return 0
+        if previous.duration.quarterLength == note.quarterLength == 0.5:
+            total += 2 * self.cost
+        elif previous.duration.quarterLength == note.quarterLength < 0.5:
+            total += 3 * self.cost
+        elif note.quarterLength <= 0.5:
+            total += self.cost
+        return total - 2 * self.cost
+
+
+class IsConnected(IntermediateNoteRule):
+    def get_cost(self, segment: Segment) -> int:
+        previous, next_ = segment.prev_segment, segment.next_segment
+        note = segment.bassNote
+        total = 0
+        if previous is not None and self.is_connected(previous.pitch, note.pitch):
+            total += self.cost
+        if next_ is not None and self.is_connected(next_.pitch, note.pitch):
+            total += self.cost
+        return total - self.cost
+
+    @staticmethod
+    def is_connected(p1, p2):
+        return abs(p1.ps - p2.ps) <= 2
+
+
+class IsAccented(IntermediateNoteRule):
+    def get_cost(self, segment: Segment) -> int:
+        return self.cost * (not segment.on_beat)

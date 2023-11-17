@@ -19,7 +19,7 @@ from music21 import exceptions21
 from music21 import note
 from music21 import pitch
 from music21 import scale
-from music21.improvedFiguredBass import realizerScale
+from music21.improvedFiguredBass import realizer_scale
 from music21.improvedFiguredBass import resolution
 from music21.improvedFiguredBass.rules_config import RulesConfig
 from music21.improvedFiguredBass.rules import RuleSet
@@ -65,7 +65,7 @@ class Segment:
     def __init__(self,
                  bassNote: str | note.Note = 'C3',
                  notationString: str | None = None,
-                 fbScale: realizerScale.FiguredBassScale = realizerScale.FiguredBassScale(),
+                 fbScale: realizer_scale.FiguredBassScale = realizerScale.FiguredBassScale(),
                  rules_config: RulesConfig | None = None,
                  maxPitch: str | pitch.Pitch = 'B5',
                  listOfPitches=None,
@@ -98,6 +98,10 @@ class Segment:
     @property
     def measure_number(self):
         return self.bassNote.measureNumber
+
+    @property
+    def duration(self):
+        return self.bassNote.duration
 
     def set_pitch_names_in_chord(self):
         self.pitchNamesInChord = self.fbScale.getPitchNames(self.bassNote.pitch, self.notation_string)

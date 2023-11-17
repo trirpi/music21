@@ -41,7 +41,7 @@ from music21 import pitch
 from music21 import stream
 from music21.figuredBass import checker
 from music21.improvedFiguredBass import notation
-from music21.improvedFiguredBass import realizerScale
+from music21.improvedFiguredBass import realizer_scale
 from music21.improvedFiguredBass import rules_config
 from music21.improvedFiguredBass import segment
 from music21.improvedFiguredBass.helpers import format_possibility
