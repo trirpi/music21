@@ -371,10 +371,7 @@ class Realization:
             self.start_offset = 0
         self.keyboardStyleOutput = True
 
-    def get_optimal_possibility_progression(self):
-        """
-        Returns a random unique possibility progression.
-        """
+    def generate_dp_table(self):
         first_possibilities = self.segment_list[0].all_filtered_possibilities(self.rule_set)
 
         dp = [  # (possibility, cost) dicts for each segment index i
@@ -401,7 +398,9 @@ class Realization:
 
                 dp_entry[possib] = best_cost
             dp.append(dp_entry)
+        return dp
 
+    def get_reverse_choices(self, dp):
         # Extract best possib
         reverse_progression = []
         d = dp[-1]
@@ -410,6 +409,9 @@ class Realization:
         best_cost = final_cost
         reverse_progression.append((best_possib, 0))
 
+        logging.log(logging.INFO, f"======================================")
+        logging.log(logging.INFO, f"Found solution with cost {final_cost}.")
+        logging.log(logging.INFO, f"======================================")
         i = len(self.segment_list) - 2
         while i >= 0:
             segment_b = self.segment_list[i + 1]
@@ -433,6 +435,14 @@ class Realization:
                 if found:
                     break
             i -= 1
+        return reverse_progression
+
+    def get_optimal_possibility_progression(self):
+        """
+        Returns a random unique possibility progression.
+        """
+        dp = self.generate_dp_table()
+        reverse_progression = self.get_reverse_choices(dp)
 
         # Delete skipped notes
         curr_idx = 0
@@ -441,7 +451,7 @@ class Realization:
         prev_segment = None
         prev_val = None
         measure = float('inf')
-        logging.log(logging.INFO, f"\n=== START LOG ========================\n")
+        logging.log(logging.INFO, f"=== START LOG ========================\n")
         for val, num_skips in reversed(reverse_progression):
             curr_segment = self.segment_list[curr_idx]
             if (m := curr_segment.measure_number) < measure:
@@ -462,9 +472,6 @@ class Realization:
         for i in reversed(idx_to_delete):
             del self.segment_list[i]
 
-        logging.log(logging.INFO, f"======================================")
-        logging.log(logging.INFO, f"Found solution with cost {final_cost}.")
-        logging.log(logging.INFO, f"======================================")
 
         return result
 
