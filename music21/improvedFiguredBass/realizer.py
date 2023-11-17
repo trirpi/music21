@@ -48,7 +48,6 @@ from music21.improvedFiguredBass.helpers import format_possibility
 from music21.improvedFiguredBass.rules import RuleSet
 from music21.improvedFiguredBass.rules_config import RulesConfig
 from music21.improvedFiguredBass.skip_rules import SkipDecision
-from music21.improvedFiguredBass.transition import SegmentTransition
 
 
 def figured_bass_from_stream(stream_part: stream.Stream) -> FiguredBassLine:
@@ -391,10 +390,8 @@ class Realization:
                     skip_decision = self.rule_set.should_skip(segment_a)
                     if skip_decision == SkipDecision.SKIP:
                         continue
-                    transition = SegmentTransition(segment_a, segment_b, self.rule_set)
                     for prev_possib, prev_cost in dp[segment_a_idx].items():
-
-                        transition_cost = transition.transitions_matrix[prev_possib][possib].get_cost()
+                        transition_cost = self.rule_set.get_cost(prev_possib, segment_a, possib, segment_b)
                         local_cost_b = segment_b.get_cost(self.rule_set, possib)
                         new_cost = prev_cost + (num_skips+1)*(transition_cost + local_cost_b)
 
@@ -424,11 +421,10 @@ class Realization:
             for segment_a_idx in range(i, max(-1, i-4), -1):
                 num_skips = i - segment_a_idx
                 segment_a = self.segment_list[segment_a_idx]
-                transition = SegmentTransition(segment_a, segment_b, self.rule_set)
                 found = False
                 for possib_a, prev_cost in dp[segment_a_idx].items():
-                    to_possib_cost = transition.segment_b.get_cost(self.rule_set, best_possib)
-                    transition_cost = transition.transitions_matrix[possib_a][best_possib].get_cost()
+                    to_possib_cost = segment_b.get_cost(self.rule_set, best_possib)
+                    transition_cost = self.rule_set.get_cost(possib_a, segment_a, best_possib, segment_b)
                     if (num_skips+1) * (transition_cost + to_possib_cost) == best_cost - prev_cost:
                         best_possib = possib_a
                         best_cost = prev_cost
