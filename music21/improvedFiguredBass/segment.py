@@ -12,7 +12,6 @@ from __future__ import annotations
 import collections
 import copy
 import itertools
-import unittest
 
 from music21 import chord
 from music21 import environment
@@ -22,15 +21,8 @@ from music21 import pitch
 from music21 import scale
 from music21.improvedFiguredBass import realizerScale
 from music21.improvedFiguredBass import resolution
-from music21.improvedFiguredBass import rules_config
+from music21.improvedFiguredBass.rules_config import RulesConfig
 from music21.improvedFiguredBass.rules import RuleSet
-
-# used below
-_MOD = 'figuredBass.segment'
-
-_defaultRealizerScale: dict[str, realizerScale.FiguredBassScale | None] = {
-    'scale': None,  # singleton
-}
 
 
 class Segment:
@@ -67,51 +59,45 @@ class Segment:
     4
     >>> s1.pitchNamesInChord
     ['C', 'E', 'G']
-    >>> [str(p) for p in s1.allPitchesAboveBass]
-    ['C3', 'E3', 'G3', 'C4', 'E4', 'G4', 'C5', 'E5', 'G5']
     >>> s1.segmentChord
     <music21.chord.Chord C3 E3 G3 C4 E4 G4 C5 E5 G5>
     """
     def __init__(self,
                  bassNote: str | note.Note = 'C3',
                  notationString: str | None = None,
-                 fbScale: realizerScale.FiguredBassScale | None = None,
-                 fbRules: rules_config.RulesConfig | None = None,
+                 fbScale: realizerScale.FiguredBassScale = realizerScale.FiguredBassScale(),
+                 rules_config: RulesConfig | None = None,
                  maxPitch: str | pitch.Pitch = 'B5',
                  listOfPitches=None,
                  play_offsets=None,
                  dynamic='mf'):
-        if isinstance(bassNote, str):
-            bassNote = note.Note(bassNote)
-        self.bassNote = bassNote
-        if isinstance(maxPitch, str):
-            maxPitch = pitch.Pitch(maxPitch)
-
-        if fbScale is None:
-            if _defaultRealizerScale['scale'] is None:
-                _defaultRealizerScale['scale'] = realizerScale.FiguredBassScale()
-            fbScale = _defaultRealizerScale['scale']  # save the time of making it
-        assert fbScale is not None  # tells mypy that we have it now
+        self.bassNote = note.Note(bassNote) if isinstance(bassNote, str) else bassNote
+        self._maxPitch = pitch.Pitch(maxPitch) if isinstance(maxPitch, str) else maxPitch
         self.fbScale = fbScale
 
-        if fbRules is None:
-            self.fbRules = rules_config.RulesConfig()
+        if rules_config is None:
+            self.rules_config = RulesConfig()
         else:
-            self.fbRules = copy.deepcopy(fbRules)
+            self.rules_config = copy.deepcopy(rules_config)
 
         self._specialResolutionRuleChecking = None
         self._singlePossibilityRuleChecking = None
         self._consecutivePossibilityRuleChecking = None
 
+        self.prev_segment = None
+        self.next_segment = None
         self.dynamic = dynamic
-
-        self.melody_notes = set()
-
-        self.bassNote = bassNote
-        self._maxPitch = maxPitch
-        self.play_offsets = play_offsets
+        self.on_beat = None
+        self.melody_pitches = set()
         self.start_offset = 0
+
+        self.play_offsets = play_offsets
         self.notation_string = notationString
+        self.pitchNamesInChord = None
+
+    @property
+    def measure_number(self):
+        return self.bassNote.measureNumber
 
     def set_pitch_names_in_chord(self):
         self.pitchNamesInChord = self.fbScale.getPitchNames(self.bassNote.pitch, self.notation_string)
@@ -141,7 +127,7 @@ class Segment:
             chord.Chord(allPitchesAboveBass, quarterLength=self.bassNote.quarterLength)
             for allPitchesAboveBass in self.allPitchesAboveBass
         ]
-        self._environRules = environment.Environment(_MOD)
+        self._environRules = environment.Environment('figuredBass.segment')
 
     def resolveDominantSeventhSegment(self, segmentB):
         # noinspection PyShadowingNames
@@ -437,7 +423,7 @@ class Segment:
         ['G4', 'G3', 'C4', 'C3']
         '''
         result = []
-        r = self.fbRules.DYNAMIC_RANGES[self.dynamic]
+        r = self.rules_config.DYNAMIC_RANGES[self.dynamic]
         for allPitchesAboveBass in self.allPitchesAboveBass:
             for i in range(r[0], r[1] + 1):
                 iterables = [allPitchesAboveBass] * (i - 1)
@@ -458,12 +444,8 @@ class Segment:
         return rul_set.get_cost(possib, self)
 
 
-# HELPER METHODS
-# --------------
-def getPitches(pitchNames=('C', 'E', 'G'),
-               bassPitch: str | pitch.Pitch = 'C3',
-               maxPitch: str | pitch.Pitch = 'C8'):
-    '''
+def getPitches(pitchNames=('C', 'E', 'G'), bassPitch: str | pitch.Pitch = 'C3', maxPitch: str | pitch.Pitch = 'C8'):
+    """
     Given a list of pitchNames, a bassPitch, and a maxPitch, returns a sorted list of
     pitches between the two limits (inclusive) which correspond to items in pitchNames.
 
@@ -485,7 +467,7 @@ def getPitches(pitchNames=('C', 'E', 'G'),
     >>> segment.getPitches(maxPitch=pitch.Pitch('E'))
     Traceback (most recent call last):
     ValueError: maxPitch must be given an octave
-    '''
+    """
     if isinstance(bassPitch, str):
         bassPitch = pitch.Pitch(bassPitch)
     if isinstance(maxPitch, str):

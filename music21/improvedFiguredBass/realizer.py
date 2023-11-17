@@ -15,14 +15,12 @@ pairs. All it takes to create well-formed realizations of a
 bass line is a few lines of music21 code,
 from start to finish. See :class:`~music21.figuredBass.realizer.FiguredBassLine` for more details.
 
->>> from music21.figuredBass import realizer
+>>> from music21.improvedFiguredBass import realizer
 >>> fbLine = realizer.FiguredBassLine()
->>> fbLine.addElement(note.Note('C3'))
->>> fbLine.addElement(note.Note('D3'), '4,3')
->>> fbLine.addElement(note.Note('C3', quarterLength = 2.0))
+>>> fbLine.add_element(note.Note('C3'))
+>>> fbLine.add_element(note.Note('D3'), '4,3')
+>>> fbLine.add_element(note.Note('C3', quarterLength = 2.0))
 >>> allSols = fbLine.realize()
->>> allSols.getNumSolutions()
-30
 """
 from __future__ import annotations
 
@@ -118,9 +116,9 @@ def figured_bass_from_stream(stream_part: stream.Stream) -> FiguredBassLine:
             if annotationString == "=":
                 fb._fbList[-1][0].duration.addDurationTuple(copy.deepcopy(n.duration))
             else:
-                fb.addElement(copy.deepcopy(n), annotationString)
+                fb.add_element(copy.deepcopy(n), annotationString)
         else:
-            fb.addElement(copy.deepcopy(n))
+            fb.add_element(copy.deepcopy(n))
 
     return fb
 
@@ -207,17 +205,17 @@ class FiguredBassLine:
         self._fbScale = realizerScale.FiguredBassScale(inKey.pitchFromDegree(1), inKey.mode)
         self._fbList = []
 
-    def addElement(self, bassObject: note.Note, notationString=None):
+    def add_element(self, bassObject: note.Note, notationString=None):
         """
         Use this method to add (bassNote, notationString) pairs to the bass line. Elements
         are realized in the order they are added.
 
 
-        >>> from music21.figuredBass import realizer
+        >>> from music21.improvedFiguredBass import realizer
         >>> fbLine = realizer.FiguredBassLine(key.Key('B'), meter.TimeSignature('3/4'))
-        >>> fbLine.addElement(note.Note('B2'))
-        >>> fbLine.addElement(note.Note('C#3'), '6')
-        >>> fbLine.addElement(note.Note('D#3'), '6')
+        >>> fbLine.add_element(note.Note('B2'))
+        >>> fbLine.add_element(note.Note('C#3'), '6')
+        >>> fbLine.add_element(note.Note('D#3'), '6')
         """
         bassObject.editorial.notationString = notationString
         c = bassObject.classes
@@ -285,7 +283,7 @@ class FiguredBassLine:
                                              fbRules, maxPitch, play_offsets=k)
             for partNumber in range(1, len(currentMapping[k])):
                 upperPitch = currentMapping[k][partNumber - 1]
-                currentSegment.fbRules._partPitchLimits.append((partNumber, upperPitch))
+                currentSegment.rules_config._partPitchLimits.append((partNumber, upperPitch))
             if startTime == previousBassNote.offset + previousBassNote.quarterLength:
                 bassNoteIndex += 1
                 previousBassNote = bassLine[bassNoteIndex]
@@ -321,20 +319,14 @@ class FiguredBassLine:
 
         if `maxPitch` is None, uses pitch.Pitch('B5')
 
-        >>> from music21.figuredBass import realizer
+        >>> from music21.improvedFiguredBass import realizer
         >>> from music21.improvedFiguredBass import rules
         >>> fbLine = realizer.FiguredBassLine(key.Key('B'), meter.TimeSignature('3/4'))
-        >>> fbLine.addElement(note.Note('B2'))
-        >>> fbLine.addElement(note.Note('C#3'), '6')
-        >>> fbLine.addElement(note.Note('D#3'), '6')
+        >>> fbLine.add_element(note.Note('B2'))
+        >>> fbLine.add_element(note.Note('C#3'), '6')
+        >>> fbLine.add_element(note.Note('D#3'), '6')
         >>> fbRules = rules.RulesConfig()
         >>> r1 = fbLine.realize(fb_rules)
-        >>> r1.getNumSolutions()
-        208
-        >>> fb_rules.forbidVoiceOverlap = False
-        >>> r2 = fbLine.realize(fb_rules)
-        >>> r2.getNumSolutions()
-        7908
         """
         if fb_rules is None:
             fb_rules = rules_config.RulesConfig()
@@ -359,7 +351,7 @@ class Realization:
     def __init__(self, **fb_line_outputs):
         # fbLineOutputs always will have three elements, checks are for sphinx documentation only.
         if 'realizedSegmentList' in fb_line_outputs:
-            self.segmentList = fb_line_outputs['realizedSegmentList']
+            self.segment_list = fb_line_outputs['realizedSegmentList']
         if 'inKey' in fb_line_outputs:
             self._inKey = fb_line_outputs['inKey']
             self._keySig = key.KeySignature(self._inKey.sharps)
@@ -383,21 +375,21 @@ class Realization:
         """
         Returns a random unique possibility progression.
         """
-        first_possibilities = self.segmentList[0].all_filtered_possibilities(self.rule_set)
+        first_possibilities = self.segment_list[0].all_filtered_possibilities(self.rule_set)
 
         dp = [  # (possibility, cost) dicts for each segment index i
-            {possib: self.segmentList[0].get_cost(self.rule_set, possib) for possib in first_possibilities}
+            {possib: self.segment_list[0].get_cost(self.rule_set, possib) for possib in first_possibilities}
         ]
 
-        for i in range(len(self.segmentList) - 1):
-            segment_b = self.segmentList[i + 1]
+        for i in range(len(self.segment_list) - 1):
+            segment_b = self.segment_list[i + 1]
             possibs_to = segment_b.all_filtered_possibilities(self.rule_set)
             dp_entry = {}
-            for possib in tqdm(possibs_to, leave=False, desc=f"Segment {i + 1}/{len(self.segmentList)}"):
+            for possib in tqdm(possibs_to, leave=False, desc=f"Segment {i + 1}/{len(self.segment_list)}"):
                 best_cost = float('inf')
                 for segment_a_idx in range(i, max(-1, i-4), -1):
                     num_skips = i - segment_a_idx
-                    segment_a = self.segmentList[segment_a_idx]
+                    segment_a = self.segment_list[segment_a_idx]
                     transition = SegmentTransition(segment_a, segment_b, self.rule_set)
                     for prev_possib, prev_cost in dp[segment_a_idx].items():
 
@@ -418,12 +410,12 @@ class Realization:
         best_cost = final_cost
         reverse_progression.append((best_possib, 0))
 
-        i = len(self.segmentList) - 2
+        i = len(self.segment_list) - 2
         while i >= 0:
-            segment_b = self.segmentList[i + 1]
+            segment_b = self.segment_list[i + 1]
             for segment_a_idx in range(i, max(-1, i-4), -1):
                 num_skips = i - segment_a_idx
-                segment_a = self.segmentList[segment_a_idx]
+                segment_a = self.segment_list[segment_a_idx]
                 transition = SegmentTransition(segment_a, segment_b, self.rule_set)
                 found = False
                 for possib_a, prev_cost in dp[segment_a_idx].items():
@@ -451,8 +443,8 @@ class Realization:
         measure = float('inf')
         logging.log(logging.INFO, f"\n=== START LOG ========================\n")
         for val, num_skips in reversed(reverse_progression):
-            curr_segment = self.segmentList[curr_idx]
-            if (m := curr_segment.bassNote.measureNumber) < measure:
+            curr_segment = self.segment_list[curr_idx]
+            if (m := curr_segment.measure_number) < measure:
                 measure = m
                 logging.log(logging.INFO, f"### Measure {measure} ###")
             if prev_val:
@@ -461,14 +453,14 @@ class Realization:
             self.rule_set.get_cost(val, curr_segment, enable_logging=True)
             result.append(val)
             for i in range(curr_idx+1, curr_idx+1+num_skips):
-                self.segmentList[curr_idx].quarterLength += self.segmentList[i].quarterLength
+                self.segment_list[curr_idx].quarterLength += self.segment_list[i].quarterLength
                 idx_to_delete.append(i)
             curr_idx += 1 + num_skips
             prev_segment = curr_segment
             prev_val = val
 
         for i in reversed(idx_to_delete):
-            del self.segmentList[i]
+            del self.segment_list[i]
 
         logging.log(logging.INFO, f"======================================")
         logging.log(logging.INFO, f"Found solution with cost {final_cost}.")
@@ -496,13 +488,13 @@ class Realization:
             if r is not None:
                 rightHand.append(copy.deepcopy(r))
 
-            for segmentIndex in range(len(self.segmentList)):
+            for segmentIndex in range(len(self.segment_list)):
                 possibA = possibility_progression[segmentIndex]
-                bassNote = self.segmentList[segmentIndex].bassNote
+                bassNote = self.segment_list[segmentIndex].bassNote
                 bassLine.append(copy.deepcopy(bassNote))
                 rhPitches = possibA[0:-1]
                 rhChord = chord.Chord(rhPitches)
-                rhChord.quarterLength = self.segmentList[segmentIndex].quarterLength
+                rhChord.quarterLength = self.segment_list[segmentIndex].quarterLength
                 rightHand.append(rhChord)
             rightHand.insert(0.0, clef.TrebleClef())
 
@@ -521,14 +513,14 @@ class Realization:
                     fbPart.append(copy.deepcopy(r))
                 upperParts.append(fbPart)
 
-            for segmentIndex in range(len(self.segmentList)):
+            for segmentIndex in range(len(self.segment_list)):
                 possibA = possibility_progression[segmentIndex]
-                bassNote = self.segmentList[segmentIndex].bassNote
+                bassNote = self.segment_list[segmentIndex].bassNote
                 bassLine.append(copy.deepcopy(bassNote))
 
                 for partNumber in range(len(possibA) - 1):
                     n1 = note.Note(possibA[partNumber])
-                    n1.quarterLength = self.segmentList[segmentIndex].quarterLength
+                    n1.quarterLength = self.segment_list[segmentIndex].quarterLength
                     upperParts[partNumber].append(n1)
 
             for upperPart in upperParts:

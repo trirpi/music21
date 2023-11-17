@@ -757,7 +757,7 @@ class HasDuplicate(SingleRule):
 class IsIncomplete(SingleRule):
     def get_cost(self, possib, segment):
         needed_pitch_names = segment.pitchNamesInChord
-        melody_notes = segment.melody_notes
+        melody_notes = segment.melody_pitches
         for pitch_names in needed_pitch_names:
             if not self.isIncomplete(possib, pitch_names.copy(), melody_notes):
                 return 0
@@ -825,7 +825,7 @@ class UpperPartsWithinLimit(SingleRule):
 
 class PitchesUnderMelody(SingleRule):
     def get_cost(self, possib, segment):
-        melody_notes = segment.melody_notes
+        melody_notes = segment.melody_pitches
         if not melody_notes:
             return 0
         return max(0, self.cost * (possib[0].ps - min([note.pitch.ps for note in melody_notes])))
