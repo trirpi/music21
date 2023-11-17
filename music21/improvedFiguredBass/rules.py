@@ -23,7 +23,7 @@ class RuleSet:
     def __init__(self, conf: RulesConfig):
         self.config = conf
 
-        self.rules = [
+        self.transition_rules = [
             ParallelFifths(cost=2*conf.highPriorityRuleCost),
             ParallelOctaves(cost=2*conf.highPriorityRuleCost),
             HiddenFifth(cost=conf.lowPriorityRuleCost),
@@ -55,9 +55,8 @@ class RuleSet:
         self.skip_rules = SkipRules()
 
     @cache
-    def get_cost(self, possib_a, segment_a, possib_b=None, segment_b=None, enable_logging=False, rules=None):
-        if rules is None:
-            rules = self.rules if possib_b else self.single_rules
+    def get_cost(self, possib_a, segment_a, possib_b=None, segment_b=None, enable_logging=False):
+        rules = self.transition_rules if possib_b else self.single_rules
 
         total_cost = 0
         for rule in rules:
