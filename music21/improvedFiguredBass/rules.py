@@ -6,7 +6,7 @@ from abc import abstractmethod, ABC
 from functools import cache
 
 from music21 import voiceLeading, pitch
-from music21.improvedFiguredBass.helpers import format_possibility
+from music21.improvedFiguredBass.possibility import Possibility
 from music21.improvedFiguredBass.rules_config import RulesConfig
 from music21.improvedFiguredBass.skip_rules import SkipDecision
 
@@ -67,10 +67,10 @@ class RuleSet:
         if enable_logging and possib_b:
             logging.log(
                 logging.INFO,
-                f"Transition cost {format_possibility(possib_a)} -> {format_possibility(possib_b)}: {total_cost}."
+                f"Transition cost {Possibility(possib_a)} -> {Possibility(possib_b)}: {total_cost}."
             )
         elif enable_logging and not possib_b:
-            logging.log(logging.INFO, f"Local cost {format_possibility(possib_a)}: {total_cost}.")
+            logging.log(logging.INFO, f"Local cost {Possibility(possib_a)}: {total_cost}.")
         return total_cost
 
     def should_skip(self, segment: 'Segment') -> SkipDecision:

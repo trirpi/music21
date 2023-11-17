@@ -44,7 +44,7 @@ from music21.improvedFiguredBass import notation
 from music21.improvedFiguredBass import realizer_scale
 from music21.improvedFiguredBass import rules_config
 from music21.improvedFiguredBass import segment
-from music21.improvedFiguredBass.helpers import format_possibility
+from music21.improvedFiguredBass.possibility import Possibility
 from music21.improvedFiguredBass.rules import RuleSet
 from music21.improvedFiguredBass.rules_config import RulesConfig
 from music21.improvedFiguredBass.skip_rules import SkipDecision
@@ -420,7 +420,7 @@ class Realization:
                         best_possib = possib_a
                         best_cost = prev_cost
                         reverse_progression.append((best_possib, num_skips))
-                        logging.log(logging.INFO, f"Chose {format_possibility(best_possib)} after skipping {num_skips} notes.")
+                        logging.log(logging.INFO, f"Chose {Possibility(best_possib)} after skipping {num_skips} notes.")
                         i -= num_skips
                         found = True
                         break
