@@ -42,11 +42,9 @@ from music21.stream.iterator import StreamIterator
 from music21.figuredBass import checker
 from music21.improvedFiguredBass import notation
 from music21.improvedFiguredBass import realizer_scale
-from music21.improvedFiguredBass import rules_config
 from music21.improvedFiguredBass import segment
 from music21.improvedFiguredBass.possibility import Possibility
 from music21.improvedFiguredBass.rules import RuleSet
-from music21.improvedFiguredBass.rules_config import RulesConfig
 from music21.improvedFiguredBass.skip_rules import SkipDecision
 
 
@@ -237,7 +235,7 @@ class FiguredBassLine:
 
         return bassLine
 
-    def retrieve_segments(self, fb_rules=None, max_pitch=None):
+    def retrieve_segments(self, max_pitch=None):
         '''
         generates the segmentList from an fbList, including any overlaid Segments
 
@@ -245,8 +243,6 @@ class FiguredBassLine:
 
         if maxPitch is None, uses pitch.Pitch('B5')
         '''
-        if fb_rules is None:
-            fb_rules = rules_config.RulesConfig()
         if max_pitch is None:
             max_pitch = pitch.Pitch('B5')
         segmentList = []
@@ -264,7 +260,7 @@ class FiguredBassLine:
         play_offsets = allKeys[0]
         previousSegment = segment.Segment(bassNote, bassNote.editorial.notationString,
                                           self._fbScale,
-                                          fb_rules, max_pitch, play_offsets=play_offsets)
+                                          max_pitch, play_offsets=play_offsets)
         previousSegment.quarterLength = previousBassNote.quarterLength
         segmentList.append(previousSegment)
         for k in allKeys[1:]:
@@ -272,7 +268,7 @@ class FiguredBassLine:
             bassNote = currentMapping[k][-1]
             currentSegment = segment.Segment(bassNote, bassNote.editorial.notationString,
                                              self._fbScale,
-                                             fb_rules, max_pitch, play_offsets=k)
+                                             max_pitch, play_offsets=k)
             for partNumber in range(1, len(currentMapping[k])):
                 upperPitch = currentMapping[k][partNumber - 1]
                 currentSegment.rules_config._partPitchLimits.append((partNumber, upperPitch))
@@ -320,12 +316,10 @@ class FiguredBassLine:
         >>> fbRules = rules.RulesConfig()
         >>> r1 = fbLine.realize(fb_rules)
         """
-        if fb_rules is None:
-            fb_rules = rules_config.RulesConfig()
         if max_pitch is None:
             max_pitch = pitch.Pitch('B5')
 
-        segmentList = self.retrieve_segments(fb_rules, max_pitch)
+        segmentList = self.retrieve_segments(max_pitch)
         if not segmentList:
             raise FiguredBassLineException('No (bassNote, notationString) pairs to realize.')
 

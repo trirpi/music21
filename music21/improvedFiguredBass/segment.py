@@ -21,7 +21,6 @@ from music21 import pitch
 from music21 import scale
 from music21.improvedFiguredBass import realizer_scale
 from music21.improvedFiguredBass import resolution
-from music21.improvedFiguredBass.rules_config import RulesConfig
 from music21.improvedFiguredBass.rules import RuleSet
 
 
@@ -66,7 +65,6 @@ class Segment:
                  bassNote: str | note.Note = 'C3',
                  notationString: str | None = None,
                  fbScale: realizer_scale.FiguredBassScale = realizer_scale.FiguredBassScale(),
-                 rules_config: RulesConfig | None = None,
                  maxPitch: str | pitch.Pitch = 'B5',
                  listOfPitches=None,
                  play_offsets=None,
@@ -74,11 +72,6 @@ class Segment:
         self.bassNote = note.Note(bassNote) if isinstance(bassNote, str) else bassNote
         self._maxPitch = pitch.Pitch(maxPitch) if isinstance(maxPitch, str) else maxPitch
         self.fbScale = fbScale
-
-        if rules_config is None:
-            self.rules_config = RulesConfig()
-        else:
-            self.rules_config = copy.deepcopy(rules_config)
 
         self._specialResolutionRuleChecking = None
         self._singlePossibilityRuleChecking = None
@@ -389,7 +382,7 @@ class Segment:
                 + 'Executing ordinary resolution.')
             return self._resolveOrdinarySegment(segmentB)
 
-    def allSinglePossibilities(self):
+    def allSinglePossibilities(self, rule_set: RuleSet):
         '''
         Returns an iterator through a set of naive possibilities for
         a Segment, using :attr:`~music21.figuredBass.segment.Segment.numParts`,
@@ -427,7 +420,7 @@ class Segment:
         ['G4', 'G3', 'C4', 'C3']
         '''
         result = []
-        r = self.rules_config.DYNAMIC_RANGES[self.dynamic]
+        r = rule_set.DYNAMIC_RANGES[self.dynamic]
         for allPitchesAboveBass in self.allPitchesAboveBass:
             for i in range(r[0], r[1] + 1):
                 iterables = [allPitchesAboveBass] * (i - 1)
@@ -436,7 +429,7 @@ class Segment:
         return result
 
     def all_filtered_possibilities(self, rule_set: RuleSet):
-        possibs = self.allSinglePossibilities()
+        possibs = self.allSinglePossibilities(rule_set)
         pairs = []
         for possib in possibs:
             cost = self.get_cost(rule_set, possib)

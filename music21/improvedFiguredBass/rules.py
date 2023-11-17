@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 
 from music21 import voiceLeading, pitch
 from music21.improvedFiguredBass.possibility import Possibility
-from music21.improvedFiguredBass.rules_config import RulesConfig
 from music21.improvedFiguredBass.skip_rules import SkipDecision, SkipRules
 
 if TYPE_CHECKING:
@@ -18,20 +17,35 @@ if TYPE_CHECKING:
 class RuleSet:
     MAX_SINGLE_POSSIB_COST = 10e10
 
-    def __init__(self, conf: RulesConfig):
-        self.config = conf
+    # number of parts range for each dynamic marking
+    DYNAMIC_RANGES = {
+        'ppp': [2, 3],
+        'pp': [2, 3],
+        'p': [3, 3],
+        'mp': [3, 4],
+        'mf': [3, 4],
+        'f': [4, 4],
+        'ff': [5, 6],
+        'fff': [5, 6]
+    }
 
+    MAX_COST = 10e4
+    HIGH_COST = 1600
+    MEDIUM_COST = 800
+    LOW_COST = 400
+
+    def __init__(self):
         self.transition_rules = [
-            ParallelFifths(cost=2*conf.highPriorityRuleCost),
-            ParallelOctaves(cost=2*conf.highPriorityRuleCost),
-            HiddenFifth(cost=conf.lowPriorityRuleCost),
-            HiddenOctave(cost=conf.lowPriorityRuleCost),
-            VoiceOverlap(cost=conf.highPriorityRuleCost),
-            # UpperPartsSame(cost=conf.lowPriorityRuleCost),
-            MinimizeMovementsMiddleVoices(cost=conf.lowPriorityRuleCost),
-            MinimizeMovementsSopranoVoice(cost=conf.highPriorityRuleCost),
-            UnpreparedNote(cost=conf.lowPriorityRuleCost),
-            CounterMovement(cost=conf.mediumPriorityRuleCost)
+            ParallelFifths(cost=2*self.HIGH_COST),
+            ParallelOctaves(cost=2*self.HIGH_COST),
+            HiddenFifth(cost=self.LOW_COST),
+            HiddenOctave(cost=self.LOW_COST),
+            VoiceOverlap(cost=self.HIGH_COST),
+            # UpperPartsSame(cost=self.lowPriorityRuleCost),
+            MinimizeMovementsMiddleVoices(cost=self.LOW_COST),
+            MinimizeMovementsSopranoVoice(cost=self.HIGH_COST),
+            UnpreparedNote(cost=self.LOW_COST),
+            CounterMovement(cost=self.MEDIUM_COST)
         ]
 
         self.single_rules = [
@@ -39,15 +53,15 @@ class RuleSet:
             HasDuplicate(cost=float('inf')),
             LimitPartToPitch(cost=5),
             NoSmallSecondInterval(cost=float('inf')),
-            IsIncomplete(cost=conf.highPriorityRuleCost),
-            UpperPartsWithinLimit(cost=2 * conf.highPriorityRuleCost),
+            IsIncomplete(cost=self.HIGH_COST),
+            UpperPartsWithinLimit(cost=2*self.HIGH_COST),
             IsPlayable(cost=float('inf')),
             PitchesWithinLimit(cost=float('inf')),
             AvoidSeventhChord(cost=7),
-            PitchesUnderMelody(cost=0.5*conf.lowPriorityRuleCost),
-            NotTooLow(cost=conf.highPriorityRuleCost),
+            PitchesUnderMelody(cost=0.5*self.LOW_COST),
+            NotTooLow(cost=self.HIGH_COST),
             ContainRoot(cost=float('inf')),
-            LessNotes(cost=conf.lowPriorityRuleCost),
+            LessNotes(cost=self.LOW_COST),
         ]
 
         self.skip_rules = SkipRules()
