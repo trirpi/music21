@@ -34,7 +34,7 @@ _defaultRealizerScale: dict[str, realizerScale.FiguredBassScale | None] = {
 
 
 class Segment:
-    '''
+    """
     A Segment corresponds to a 1:1 realization of a bassNote and notationString
     of a :class:`~music21.figuredBass.realizer.FiguredBassLine`.
     It is created by passing six arguments: a
@@ -71,43 +71,12 @@ class Segment:
     ['C3', 'E3', 'G3', 'C4', 'E4', 'G4', 'C5', 'E5', 'G5']
     >>> s1.segmentChord
     <music21.chord.Chord C3 E3 G3 C4 E4 G4 C5 E5 G5>
-    '''
-    _DOC_ORDER = ['allSinglePossibilities',
-                  'singlePossibilityRules',
-                  'allCorrectSinglePossibilities',
-                  'consecutivePossibilityRules',
-                  'specialResolutionRules',
-                  'allCorrectConsecutivePossibilities',
-                  'resolveDominantSeventhSegment',
-                  'resolveDiminishedSeventhSegment',
-                  'resolveAugmentedSixthSegment']
-    _DOC_ATTR: dict[str, str] = {
-        'bassNote': '''A :class:`~music21.note.Note` whose pitch
-             forms the bass of each possibility.''',
-        'numParts': '''The number of parts (including the bass) that possibilities
-             should contain, which
-             comes directly from :attr:`~music21.figuredBass.rules.Rules.numParts`
-             in the Rules object.''',
-        'pitchNamesInChord': '''A list of allowable pitch names.
-             This is derived from bassNote.pitch and notationString
-             using :meth:`~music21.figuredBass.realizerScale.FiguredBassScale.getPitchNames`.''',
-        'allPitchesAboveBass': '''A list of allowable pitches in the upper parts of a possibility.
-             This is derived using
-             :meth:`~music21.figuredBass.segment.getPitches`, providing bassNote.pitch,
-             :attr:`~music21.figuredBass.rules.Rules.maxPitch`
-             from the Rules object, and
-             :attr:`~music21.figuredBass.segment.Segment.pitchNamesInChord` as arguments.''',
-        'segmentChord': ''':attr:`~music21.figuredBass.segment.Segment.allPitchesAboveBass`
-             represented as a :class:`~music21.chord.Chord`.''',
-        'fbRules': 'A deepcopy of the :class:`~music21.figuredBass.rules.Rules` object provided.',
-    }
-
+    """
     def __init__(self,
                  bassNote: str | note.Note = 'C3',
                  notationString: str | None = None,
                  fbScale: realizerScale.FiguredBassScale | None = None,
                  fbRules: rules_config.RulesConfig | None = None,
-                 numParts=None,
                  maxPitch: str | pitch.Pitch = 'B5',
                  listOfPitches=None,
                  play_offsets=None,
@@ -146,7 +115,6 @@ class Segment:
 
     def set_pitch_names_in_chord(self):
         self.pitchNamesInChord = self.fbScale.getPitchNames(self.bassNote.pitch, self.notation_string)
-
 
     def update_pitch_names_in_chord(self, past_measure):
         newPitchNamesInChord = []
@@ -571,16 +539,3 @@ def _compileRules(rulesList, maxLength=5):
 
 class SegmentException(exceptions21.Music21Exception):
     pass
-
-
-# ------------------------------------------------------------------------------
-
-
-class Test(unittest.TestCase):
-    pass
-
-
-if __name__ == '__main__':
-    import music21
-
-    music21.mainTest(Test)

@@ -49,10 +49,10 @@ class RuleSet:
         ]
 
         self.intermediate_rules = [
-            IsConnected(2*conf.highPriorityRuleCost),
-            IsFast(2*conf.highPriorityRuleCost),
+            IsConnected(5*conf.highPriorityRuleCost),
+            IsFast(5*conf.highPriorityRuleCost),
             HasAnnotation(5*conf.highPriorityRuleCost),
-            IsAccented(2*conf.highPriorityRuleCost),
+            IsAccented(10*conf.highPriorityRuleCost),
         ]
 
     def get_rules(self):
@@ -973,7 +973,7 @@ class IsConnected(IntermediateNoteRule):
 
 class HasAnnotation(IntermediateNoteRule):
     def get_cost_intermediate(self, previous: Note, note: Note, next_: Note, annotation):
-        return -self.cost if annotation else self.cost
+        return -self.cost if annotation else 0
 
 
 class IsAccented(IntermediateNoteRule):

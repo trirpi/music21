@@ -166,9 +166,9 @@ class RulesConfig(prebase.ProtoM21Object):
         self.upperPartsMaxSemitoneSeparation = 12
         self.forbidVoiceCrossing = True
 
-        self.highPriorityRuleCost = 16
-        self.mediumPriorityRuleCost = 8
-        self.lowPriorityRuleCost = 4
+        self.highPriorityRuleCost = 1600
+        self.mediumPriorityRuleCost = 800
+        self.lowPriorityRuleCost = 400
 
         # Special resolution rules
         self.resolveDominantSeventhProperly = True
