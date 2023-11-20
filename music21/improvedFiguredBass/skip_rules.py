@@ -13,7 +13,7 @@ class SkipDecision(Enum):
 
 
 class SkipRules:
-    MUST_SKIP_THRESHOLD = 20
+    MUST_SKIP_THRESHOLD = 15
 
     def __init__(self):
         self.rules = [
@@ -23,14 +23,16 @@ class SkipRules:
         ]
 
     def should_skip(self, segment: 'Segment') -> SkipDecision:
-        if (segment.notation_string
+        if (
+            segment.notation_string
             or segment.duration.quarterLength >= 1
             or segment.prev_segment is None
             or segment.prev_segment.duration.quarterLength < segment.duration.quarterLength
+            or segment.on_beat >= 2
         ):
             return SkipDecision.NO_SKIP
 
-        if sum(r.get_cost(segment) for r in self.rules) > self.MUST_SKIP_THRESHOLD:
+        if sum(r.get_cost(segment) for r in self.rules) >= self.MUST_SKIP_THRESHOLD:
             return SkipDecision.SKIP
 
         return SkipDecision.UNKNOWN
@@ -47,19 +49,12 @@ class IntermediateNoteRule(ABC):
 
 class IsFast(IntermediateNoteRule):
     def get_cost(self, segment: 'Segment') -> int:
-        previous = segment.prev_segment
-        note = segment.bassNote
-
-        total = 0
-        if previous is None:
-            return 0
-        if previous.duration.quarterLength == note.quarterLength == 0.5:
-            total += 2 * self.cost
-        elif previous.duration.quarterLength == note.quarterLength < 0.5:
-            total += 3 * self.cost
-        elif note.quarterLength <= 0.5:
-            total += self.cost
-        return total - 2 * self.cost
+        note_length = segment.bassNote.quarterLength
+        if note_length == 0.5:
+            return self.cost
+        elif note_length < 0.5:
+            return 2*self.cost
+        return 0
 
 
 class IsConnected(IntermediateNoteRule):
@@ -71,7 +66,7 @@ class IsConnected(IntermediateNoteRule):
             total += self.cost
         if next_ is not None and self.is_connected(next_.pitch, note.pitch):
             total += self.cost
-        return total - self.cost
+        return total
 
     @staticmethod
     def is_connected(p1, p2):

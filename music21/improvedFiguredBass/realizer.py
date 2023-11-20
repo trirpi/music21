@@ -348,7 +348,7 @@ class Realization:
         if 'rule_set' in fb_line_outputs:
             self.rule_set = fb_line_outputs['rule_set']
         else:
-            self.rule_set = RuleSet(RulesConfig())
+            self.rule_set = RuleSet()
         if 'start_offset' in fb_line_outputs:
             self.start_offset = fb_line_outputs['start_offset']
         else:
@@ -368,7 +368,7 @@ class Realization:
             dp_entry = {}
             for possib in tqdm(possibs_to, leave=False, desc=f"Segment {i + 1}/{len(self.segment_list)}"):
                 best_cost = float('inf')
-                for segment_a_idx in range(i, max(-1, i-4), -1):
+                for segment_a_idx in range(i, -1, -1):
                     num_skips = i - segment_a_idx
                     segment_a = self.segment_list[segment_a_idx]
                     skip_decision = self.rule_set.should_skip(segment_a)
@@ -402,7 +402,7 @@ class Realization:
         i = len(self.segment_list) - 2
         while i >= 0:
             segment_b = self.segment_list[i + 1]
-            for segment_a_idx in range(i, max(-1, i-4), -1):
+            for segment_a_idx in range(i, -1, -1):
                 num_skips = i - segment_a_idx
                 segment_a = self.segment_list[segment_a_idx]
                 found = False
