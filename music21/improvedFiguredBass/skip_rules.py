@@ -26,7 +26,7 @@ class SkipRules:
         if (segment.notation_string
             or segment.duration.quarterLength >= 1
             or segment.prev_segment is None
-            or segment.prev_segment.duration < segment.duration
+            or segment.prev_segment.duration.quarterLength < segment.duration.quarterLength
         ):
             return SkipDecision.NO_SKIP
 
