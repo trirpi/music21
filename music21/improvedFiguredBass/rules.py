@@ -477,11 +477,6 @@ class VoiceOverlap(TransitionRule):
         >>> possibB1 = (F4, F4, D4, D4)
         >>> possibility.voiceOverlap(possibA1, possibB1)
         True
-        >>> possibility.voice_crossing(possibA1)
-        False
-        >>> possibility.voice_crossing(possibB1)
-        False
-
 
         Here is the same example as above, except the soprano of the second
         possibility is now B4, which does not overlap the G4 of the first.

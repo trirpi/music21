@@ -440,7 +440,8 @@ class Realization:
         logging.log(logging.INFO, f"=== START LOG ========================\n")
         for val, num_skips in reversed(reverse_progression):
             curr_segment = self.segment_list[curr_idx]
-            if (m := curr_segment.measure_number) < measure:
+            m = curr_segment.measure_number
+            if m is not None and m < measure:
                 measure = m
                 logging.log(logging.INFO, f"### Measure {measure} ###")
             if prev_val:
