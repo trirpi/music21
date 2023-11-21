@@ -10,7 +10,6 @@
 from __future__ import annotations
 
 import collections
-import copy
 import itertools
 
 from music21 import chord
@@ -81,6 +80,7 @@ class Segment:
         self.next_segment = None
         self.dynamic = dynamic
         self.on_beat = None
+        self.is_tonic = None
         self.melody_pitches = set()
         self.start_offset = 0
 
