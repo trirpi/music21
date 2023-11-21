@@ -80,7 +80,6 @@ class Segment:
         self.next_segment = None
         self.dynamic = dynamic
         self.on_beat = None
-        self.is_tonic = None
         self.melody_pitches = set()
         self.start_offset = 0
 
@@ -95,6 +94,25 @@ class Segment:
     @property
     def duration(self):
         return self.bassNote.duration
+
+    @property
+    def root_note_pitch_class(self):
+        return self.segmentChord[0].root().ps % 12
+
+    @property
+    def is_tonic_chord(self):
+        return self.bassNote.key_pitch_class == self.root_note_pitch_class
+
+    @property
+    def ends_cadence(self):
+        return (
+            self.is_tonic_chord and
+            self.root_note_pitch_class == self.bassNote.pitch.ps % 12 and
+            self.prev_segment and (
+                int(self.prev_segment.bassNote.pitch.ps) % 12 == (self.root_note_pitch_class + 7) % 12
+                # or int(self.prev_segment.bassNote.pitch.ps) % 12 == (self.root_note_pitch_class + 11) % 12
+            )
+        )
 
     def set_pitch_names_in_chord(self):
         self.pitchNamesInChord = self.fbScale.getPitchNames(self.bassNote.pitch, self.notation_string)
