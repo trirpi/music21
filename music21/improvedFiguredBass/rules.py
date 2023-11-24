@@ -56,6 +56,7 @@ class RuleSet:
             NoSmallSecondInterval(cost=float('inf')),
             IsPlayable(cost=float('inf')),
             PitchesWithinLimit(cost=float('inf')),
+            DoubleRootIfCadence(cost=3*self.HIGH_COST),
             UpperPartsWithinLimit(cost=2*self.HIGH_COST),
             NotTooLow(cost=self.HIGH_COST),
             IsIncomplete(cost=self.HIGH_COST),
@@ -80,6 +81,8 @@ class RuleSet:
             if enable_logging and cost != 0:
                 logging.log(logging.INFO, f"Cost += {cost} due to {rule.__class__.__name__}")
             total_cost += cost
+            if total_cost == float('inf'):
+                break
 
         if enable_logging and possib_b:
             logging.log(
@@ -941,6 +944,18 @@ class NotesFromFigures(SingleRule):
             if p.name in needed_pitch_classes:
                 needed_pitch_classes.remove(p.name)
         return 0 if len(needed_pitch_classes) == 0 else self.cost
+
+
+class DoubleRootIfCadence(SingleRule):
+    def get_cost(self, possib, segment):
+        if segment.ends_cadence:
+            root_pitch = possib[-1]
+            for pitch in possib[:-1]:
+                if pitch.name == root_pitch.name:
+                    return 0
+            return self.cost
+        return 0
+
 
 def partPairs(possibA, possibB):
     '''
