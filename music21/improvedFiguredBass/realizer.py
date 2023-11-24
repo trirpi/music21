@@ -42,7 +42,6 @@ from music21.figuredBass import checker
 from music21.improvedFiguredBass import notation
 from music21.improvedFiguredBass import realizer_scale
 from music21.improvedFiguredBass import segment
-from music21.improvedFiguredBass.possibility import Possibility
 from music21.improvedFiguredBass.rules import RuleSet
 from music21.improvedFiguredBass.skip_rules import SkipDecision
 
@@ -413,7 +412,7 @@ class Realization:
                         best_possib = possib_a
                         best_cost = prev_cost
                         reverse_progression.append((best_possib, num_skips))
-                        logging.log(logging.INFO, f"Chose {Possibility(best_possib)} after skipping {num_skips} notes.")
+                        logging.log(logging.INFO, f"Chose {best_possib} after skipping {num_skips} notes.")
                         i -= num_skips
                         found = True
                         break
@@ -477,7 +476,7 @@ class Realization:
             rightHand.append([copy.deepcopy(self._keySig), copy.deepcopy(self._inTime)])
 
             for segmentIndex in range(len(self.segment_list)):
-                possibA = possibility_progression[segmentIndex]
+                possibA = possibility_progression[segmentIndex].pitches
                 bassNote = self.segment_list[segmentIndex].bassNote
                 bassLine.append(copy.deepcopy(bassNote))
                 rhPitches = possibA[0:-1]
@@ -488,14 +487,14 @@ class Realization:
 
         else:  # Chorale-style output
             upperParts = []
-            for partNumber in range(len(possibility_progression[0]) - 1):
+            for partNumber in range(len(possibility_progression[0].pitches) - 1):
                 fbPart = stream.Part()
                 sol.insert(0.0, fbPart)
                 fbPart.append([copy.deepcopy(self._keySig), copy.deepcopy(self._inTime)])
                 upperParts.append(fbPart)
 
             for segmentIndex in range(len(self.segment_list)):
-                possibA = possibility_progression[segmentIndex]
+                possibA = possibility_progression[segmentIndex].pitches
                 bassNote = self.segment_list[segmentIndex].bassNote
                 bassLine.append(copy.deepcopy(bassNote))
 

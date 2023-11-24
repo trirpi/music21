@@ -20,6 +20,7 @@ from music21 import pitch
 from music21 import scale
 from music21.improvedFiguredBass import realizer_scale
 from music21.improvedFiguredBass import resolution
+from music21.improvedFiguredBass.possibility import Possibility
 from music21.improvedFiguredBass.rules import RuleSet
 
 
@@ -84,10 +85,13 @@ class Segment:
         self.start_offset = 0
 
         self.play_offsets = play_offsets
-        self.notation_string = notationString
-        self.alternative_notation_strings = []
-        self.pitch_names_in_chord = None
-        self.pitch_names_in_figures = None # pitch names that are specifically in figures
+        self.notation_strings = [notationString]
+        if self.notation_strings[0] is None:
+            self.notation_strings.append('6')
+
+        self.segment_options = [SegmentOption(self, n, i) for i, n in enumerate(self.notation_strings)]
+
+        self._environRules = environment.Environment('figuredBass.segment')
 
     @property
     def measure_number(self):
@@ -98,45 +102,21 @@ class Segment:
         return self.bassNote.duration
 
     @property
-    def root_note_pitch_class(self):
-        return self.segmentChord.root().ps % 12
-
-    @property
-    def is_tonic_chord(self):
-        return self.bassNote.key_pitch_class == self.root_note_pitch_class
-
-    @property
     def ends_cadence(self):
         return (
-            self.is_tonic_chord and
-            self.root_note_pitch_class == self.bassNote.pitch.ps % 12 and
+            self.notation_strings[0] is None and
             self.prev_segment and (
-                int(self.prev_segment.bassNote.pitch.ps) % 12 == (self.root_note_pitch_class + 7) % 12
+                int(self.prev_segment.bassNote.pitch.ps) % 12 == (self.bassNote.pitch.ps + 7) % 12
             )
         )
 
     def set_pitch_names_in_chord(self):
-        self.pitch_names_in_chord = self.fbScale.getPitchNames(self.bassNote.pitch, self.notation_string)
-        self.pitch_names_in_figures = self.fbScale.getFigurePitchNames(self.bassNote.pitch, self.notation_string)
+        for option in self.segment_options:
+            option.set_pitch_names_in_chord()
 
     def update_pitch_names_in_chord(self, past_measure):
-        self.pitch_names_in_figures = set(self.update_pitch_names_in_single_chord(self.pitch_names_in_figures, past_measure))
-        self.pitch_names_in_chord = self.update_pitch_names_in_single_chord(self.pitch_names_in_chord, past_measure)
-
-    def update_pitch_names_in_single_chord(self, pitch_names, past_measure):
-        newPitchNamesInChord = []
-        for name in pitch_names:
-            if name in past_measure:
-                newName = past_measure[name][0].modifyPitchName(name)
-                newPitchNamesInChord.append(newName)
-            else:
-                newPitchNamesInChord.append(name)
-        return newPitchNamesInChord
-
-    def finish_initialization(self):
-        self.allPitchesAboveBass = getPitches(self.pitch_names_in_chord, self.bassNote.pitch, self._maxPitch)
-        self.segmentChord = chord.Chord(self.allPitchesAboveBass, quarterLength=self.bassNote.quarterLength)
-        self._environRules = environment.Environment('figuredBass.segment')
+        for option in self.segment_options:
+            option.update_pitch_names_in_chord(past_measure)
 
     def resolveDominantSeventhSegment(self, segmentB):
         # noinspection PyShadowingNames
@@ -395,6 +375,74 @@ class Segment:
             return self._resolveOrdinarySegment(segmentB)
 
     def allSinglePossibilities(self, rule_set: RuleSet):
+        result = []
+        for option in self.segment_options:
+            result.extend(option.all_single_possibilities(rule_set))
+        return result
+
+    def all_filtered_possibilities(self, rule_set: RuleSet):
+        possibs = self.allSinglePossibilities(rule_set)
+        pairs = []
+        for possib in possibs:
+            cost = self.get_cost(rule_set, possib)
+            if cost <= rule_set.MAX_SINGLE_POSSIB_COST:
+                pairs.append(possib)
+        return pairs
+
+    def finish_initialization(self):
+        for option in self.segment_options:
+            option.finish_initialization()
+
+    def get_cost(self, rul_set, possib):
+        return rul_set.get_cost(possib, self)
+
+
+class SegmentOption:
+    def __init__(self, segment: Segment, notation_string: str, index: int):
+        self.segment = segment
+        self.notation_string = notation_string
+
+        self.pitch_names_in_chord = None
+        self.pitch_names_in_figures = None  # pitch names that are specifically in figures
+
+        self.all_pitches_above_bass = None
+        self.segment_chord = None
+
+        self.index = index
+
+    @property
+    def bass_note(self):
+        return self.segment.bassNote
+
+    @property
+    def root_note_pitch_class(self):
+        return self.segment_chord.root().ps % 12
+
+    def set_pitch_names_in_chord(self):
+        self.pitch_names_in_chord = self.segment.fbScale.getPitchNames(self.segment.bassNote.pitch, self.notation_string)
+        self.pitch_names_in_figures = self.segment.fbScale.getFigurePitchNames(self.segment.bassNote.pitch, self.notation_string)
+
+    def update_pitch_names_in_chord(self, past_measure):
+        self.pitch_names_in_figures = set(self.update_pitch_names_in_single_chord(self.pitch_names_in_figures, past_measure))
+        self.pitch_names_in_chord = self.update_pitch_names_in_single_chord(self.pitch_names_in_chord, past_measure)
+
+    def update_pitch_names_in_single_chord(self, pitch_names, past_measure):
+        newPitchNamesInChord = []
+        for name in pitch_names:
+            if name in past_measure:
+                newName = past_measure[name][0].modifyPitchName(name)
+                newPitchNamesInChord.append(newName)
+            else:
+                newPitchNamesInChord.append(name)
+        return newPitchNamesInChord
+
+    def finish_initialization(self):
+        self.all_pitches_above_bass = getPitches(
+            self.pitch_names_in_chord, self.segment.bassNote.pitch, self.segment._maxPitch
+        )
+        self.segment_chord = chord.Chord(self.all_pitches_above_bass, quarterLength=self.segment.bassNote.quarterLength)
+
+    def all_single_possibilities(self, rule_set: RuleSet):
         '''
         Returns an iterator through a set of naive possibilities for
         a Segment, using :attr:`~music21.figuredBass.segment.Segment.numParts`,
@@ -432,12 +480,12 @@ class Segment:
         ['G4', 'G3', 'C4', 'C3']
         '''
         result = []
-        r = rule_set.DYNAMIC_RANGES[self.dynamic]
+        r = rule_set.DYNAMIC_RANGES[self.segment.dynamic]
         for i in range(r[0], r[1] + 1):
-            iterables = [self.allPitchesAboveBass] * (i - 1)
-            iterables.append([pitch.Pitch(self.bassNote.pitch.nameWithOctave)])
+            iterables = [self.all_pitches_above_bass] * (i - 1)
+            iterables.append([pitch.Pitch(self.segment.bassNote.pitch.nameWithOctave)])
             result += list(itertools.product(*iterables))
-        return result
+        return [Possibility(pitches, self.index) for pitches in result]
 
     def all_filtered_possibilities(self, rule_set: RuleSet):
         possibs = self.allSinglePossibilities(rule_set)
@@ -450,7 +498,6 @@ class Segment:
 
     def get_cost(self, rul_set, possib):
         return rul_set.get_cost(possib, self)
-
 
 def getPitches(pitchNames=('C', 'E', 'G'), bassPitch: str | pitch.Pitch = 'C3', maxPitch: str | pitch.Pitch = 'C8'):
     """
