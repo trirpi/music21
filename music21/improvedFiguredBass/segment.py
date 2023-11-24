@@ -86,6 +86,7 @@ class Segment:
         self.play_offsets = play_offsets
         self.notation_string = notationString
         self.pitchNamesInChord = None
+        self.pitchNamesInFigures = None # pitch names that are specifically in figures
 
     @property
     def measure_number(self):
@@ -110,17 +111,19 @@ class Segment:
             self.root_note_pitch_class == self.bassNote.pitch.ps % 12 and
             self.prev_segment and (
                 int(self.prev_segment.bassNote.pitch.ps) % 12 == (self.root_note_pitch_class + 7) % 12
-                # or int(self.prev_segment.bassNote.pitch.ps) % 12 == (self.root_note_pitch_class + 11) % 12
             )
         )
 
     def set_pitch_names_in_chord(self):
         self.pitchNamesInChord = self.fbScale.getPitchNames(self.bassNote.pitch, self.notation_string)
+        self.pitchNamesInFigures = self.fbScale.getFigurePitchNames(self.bassNote.pitch, self.notation_string)
 
     def update_pitch_names_in_chord(self, past_measure):
         newPitchNamesInChord = []
         for pitch_names in self.pitchNamesInChord:
-            newPitchNamesInChord.append(self.update_pitch_names_in_single_chord(pitch_names, past_measure))
+            new_in_chord = self.update_pitch_names_in_single_chord(pitch_names, past_measure)
+            newPitchNamesInChord.append(new_in_chord)
+        self.pitchNamesInFigures = set(self.update_pitch_names_in_single_chord(self.pitchNamesInFigures, past_measure))
         self.pitchNamesInChord = newPitchNamesInChord
 
     def update_pitch_names_in_single_chord(self, pitch_names, past_measure):

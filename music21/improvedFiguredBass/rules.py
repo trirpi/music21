@@ -50,18 +50,19 @@ class RuleSet:
 
         self.single_rules = [
             # VoiceCrossing(cost=float('inf')),
+            NotesFromFigures(cost=float('inf')),
+            ContainRoot(cost=float('inf')),
             HasDuplicate(cost=float('inf')),
-            LimitPartToPitch(cost=5),
             NoSmallSecondInterval(cost=float('inf')),
-            IsIncomplete(cost=self.HIGH_COST),
-            UpperPartsWithinLimit(cost=2*self.HIGH_COST),
             IsPlayable(cost=float('inf')),
             PitchesWithinLimit(cost=float('inf')),
-            AvoidSeventhChord(cost=7),
-            PitchesUnderMelody(cost=0.5*self.LOW_COST),
+            UpperPartsWithinLimit(cost=2*self.HIGH_COST),
             NotTooLow(cost=self.HIGH_COST),
-            ContainRoot(cost=float('inf')),
+            IsIncomplete(cost=self.HIGH_COST),
+            AvoidSeventhChord(cost=7),
+            LimitPartToPitch(cost=5),
             LessNotes(cost=self.LOW_COST),
+            PitchesUnderMelody(cost=0.5 * self.LOW_COST),
         ]
 
         self.skip_rules = SkipRules()
@@ -932,6 +933,14 @@ class LessNotes(SingleRule):
     def get_cost(self, possib, segment):
         return max(0, (len(possib) - 2)) * self.cost
 
+
+class NotesFromFigures(SingleRule):
+    def get_cost(self, possib, segment):
+        needed_pitch_classes = segment.pitchNamesInFigures.copy()
+        for p in possib:
+            if p.name in needed_pitch_classes:
+                needed_pitch_classes.remove(p.name)
+        return 0 if len(needed_pitch_classes) == 0 else self.cost
 
 def partPairs(possibA, possibB):
     '''

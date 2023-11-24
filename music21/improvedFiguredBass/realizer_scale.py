@@ -19,8 +19,7 @@ from music21 import note
 from music21 import pitch
 from music21 import scale
 from music21.improvedFiguredBass import notation
-from music21.improvedFiguredBass.notation import convertToPitch
-from music21.pitch import Pitch
+from music21.improvedFiguredBass.notation import convertToPitch, Modifier
 
 scaleModes = {'major': scale.MajorScale,
               'minor': scale.MinorScale,
@@ -117,6 +116,47 @@ class FiguredBassScale:
             pitchNames.reverse()
             result.append(pitchNames)
         return result
+
+    def getFigurePitchNames(self, bassPitch, notationString=None):
+        '''
+        Takes a bassPitch and notationString and returns a list of corresponding
+        pitch names based on the scale value and mode above and inclusive of the
+        bassPitch name.
+
+        >>> from music21.figuredBass import realizerScale
+        >>> fbScale = realizerScale.FiguredBassScale()
+        >>> fbScale.getPitchNames('D3', '6')
+        ['D', 'F', 'B']
+        >>> fbScale.getPitchNames('G3')
+        ['G', 'B', 'D']
+        >>> fbScale.getPitchNames('B3', '6,#5')
+        ['B', 'D', 'F#', 'G']
+        >>> fbScale.getPitchNames('C#3', '-7')  # Fully diminished seventh chord
+        ['C#', 'E', 'G', 'B-']
+        '''
+        bassPitch = convertToPitch(bassPitch)  # Convert string to pitch (if necessary)
+        bassSD = self.realizerScale.getScaleDegreeFromPitch(bassPitch)
+        nt = notation.Notation(notationString)
+
+        if bassSD is None:
+            bassPitchCopy = copy.deepcopy(bassPitch)
+            bassNote = note.Note(bassPitchCopy)
+            if (self.keySig.accidentalByStep(bassNote.pitch.step)
+                != bassNote.pitch.accidental):
+                bassNote.pitch.accidental = self.keySig.accidentalByStep(bassNote.pitch.step)
+            bassSD = self.realizerScale.getScaleDegreeFromPitch(bassNote.pitch)
+
+        pitchNames = set()
+        for number, modifier in zip(nt.origNumbers, nt.origModStrings):
+            if number is None:
+                continue
+            pitchSD = (bassSD + number - 1) % 7
+            samplePitch = self.realizerScale.pitchFromDegree(pitchSD)
+            pitchNames.add(samplePitch.name)
+            if modifier is not None:
+                self.modify[samplePitch.name] = Modifier(modifier)
+
+        return pitchNames
 
     def getSamplePitches(self, bassPitch, notationString=None):
         '''
