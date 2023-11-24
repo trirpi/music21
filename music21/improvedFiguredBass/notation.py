@@ -18,30 +18,30 @@ from music21 import pitch
 from music21 import prebase
 
 shorthandNotation = {
-    (): [(5, 3)], #, (6, 3)],
-    (5,): [(5, 3)],
-    (5, 2): [(5, 2)],
-    (5, 4): [(5, 4)],
-    (6,): [(6, 3)], #, (6, 4, 3)],
-    (7,): [(7, 5, 3)],
-    (7, 3): [(7, 5, 3)],
-    (7, 5): [(7, 5, 3)],
-    (8,): [(5, 3)],
-    (8, 5): [(5, 3)],
-    (9,): [(9, 7, 5, 3)],
-    (9, 7): [(9, 7, 5, 3)],
-    (11,): [(11, 9, 7, 5, 3)],
-    (13,): [(13, 11, 9, 7, 5, 3)],
-    (6, 5): [(6, 5, 3)],
-    (6, 4): [(6, 4)],
-    (6, 4, 2): [(6, 4, 2)],# (5, 4, 2)],
-    (6, 3): [(6, 3)],# (6, 4, 3)],
-    (4, 3): [(6, 4, 3)],
-    (4, 2): [(6, 4, 2)],# (5, 4, 2)],
-    (2,): [(5, 2)], #(7, 4, 2)],
-    (4,): [(5, 4)],
-    (3,): [(5, 3)],
-    (3, 2): [(5, 3, 2)],
+    (None,): (5, 3), #, (6, 3)],
+    (5,): (5, 3),
+    (5, 2): (5, 2),
+    (5, 4): (5, 4),
+    (6,): (6, 3), #, (6, 4, 3)],
+    (7,): (7, 5, 3),
+    (7, 3): (7, 5, 3),
+    (7, 5): (7, 5, 3),
+    (8,): (5, 3),
+    (8, 5): (5, 3),
+    (9,): (9, 7, 5, 3),
+    (9, 7): (9, 7, 5, 3),
+    (11,): (11, 9, 7, 5, 3),
+    (13,): (13, 11, 9, 7, 5, 3),
+    (6, 5): (6, 5, 3),
+    (6, 4): (6, 4),
+    (6, 4, 2): (6, 4, 2),# (5, 4, 2)],
+    (6, 3): (6, 3),# (6, 4, 3)],
+    (4, 3): (6, 4, 3),
+    (4, 2): (6, 4, 2),# (5, 4, 2)],
+    (2,): (5, 2), #(7, 4, 2)],
+    (4,): (5, 4),
+    (3,): (5, 3),
+    (3, 2): (5, 3, 2),
  }
 
 shortHandNotationBass = {
@@ -253,17 +253,16 @@ class Notation(prebase.ProtoM21Object):
         self.figureStrings: list[str] = []
         self.origNumbers: tuple[int | None, ...] = ()
         self.origModStrings: tuple[str | None, ...] = ()
-        self.numbers: list = []
-        self.modifierStrings: list = []
+        self.numbers: list[int] = []
+        self.modifierStrings: tuple[str | None, ...] = ()
         self.extenders: list[bool] = []
         self.hasExtenders: bool = False
-        self.bass_note = None
         self._parseNotationColumn()
         self._translateToLonghand()
 
         # Convert to convenient notation
-        self.modifiers: list[tuple[Modifier, ...]] = []
-        self.figures: list = []
+        self.modifiers: tuple[Modifier, ...] = ()
+        self.figures: list[Figure] = []
         self.figuresFromNotationColumn: list[Figure] = []
         self._getModifiers()
         self._getFigures()
@@ -393,36 +392,33 @@ class Notation(prebase.ProtoM21Object):
         >>> notation2.modifierStrings
         ('-', '-')
         '''
-        self.numbers = tuple([a for a in self.numbers if a is not None])
         oldNumbers = self.numbers
         newNumbers = oldNumbers
         oldModifierStrings = self.modifierStrings
         newModifierStrings = oldModifierStrings
-        self.numbers = []
-        self.modifierStrings = []
 
         try:
-            assert oldNumbers in shorthandNotation, oldNumbers
-            newNumbers_possibs = shorthandNotation[oldNumbers]
-            self.bassNote = shortHandNotationBass[oldNumbers]
-            for newNumbers in newNumbers_possibs:
-                newModifierStrings = []
+            newNumbers = shorthandNotation[oldNumbers]
+            newModifierStrings = []
 
-                oldNumbers = list(oldNumbers)
-                if len(oldModifierStrings) > len(oldNumbers):
-                    oldNumbers.append(3)
-                oldNumbers = tuple(oldNumbers)
+            oldNumbers = list(oldNumbers)
+            temp = []
+            for number in oldNumbers:
+                if number is None:
+                    temp.append(3)
+                else:
+                    temp.append(number)
 
-                for number in newNumbers:
-                    newModifierString = None
-                    if number in oldNumbers:
-                        modifierStringIndex = oldNumbers.index(number)
-                        newModifierString = oldModifierStrings[modifierStringIndex]
-                    newModifierStrings.append(newModifierString)
+            oldNumbers = tuple(temp)
 
-                newModifierStrings = tuple(newModifierStrings)
-                self.numbers.append(newNumbers)
-                self.modifierStrings.append(newModifierStrings)
+            for number in newNumbers:
+                newModifierString = None
+                if number in oldNumbers:
+                    modifierStringIndex = oldNumbers.index(number)
+                    newModifierString = oldModifierStrings[modifierStringIndex]
+                newModifierStrings.append(newModifierString)
+
+            newModifierStrings = tuple(newModifierStrings)
         except KeyError:
             newNumbers = list(newNumbers)
             temp = []
@@ -433,8 +429,9 @@ class Notation(prebase.ProtoM21Object):
                     temp.append(number)
 
             newNumbers = tuple(temp)
-            self.numbers.append(newNumbers)
-            self.modifierStrings.append(newModifierStrings)
+
+        self.numbers = newNumbers
+        self.modifierStrings = newModifierStrings
 
     def _getModifiers(self):
         '''
@@ -453,15 +450,14 @@ class Notation(prebase.ProtoM21Object):
         >>> notation1.modifiers[2]
         <music21.figuredBass.notation.Modifier + sharp>
         '''
-        for j, modifierStrings in enumerate(self.modifierStrings):
-            modifiers = []
+        modifiers = []
 
-            for i in range(len(self.numbers[j])):
-                modifierString = modifierStrings[i]
-                modifier = Modifier(modifierString)
-                modifiers.append(modifier)
+        for i in range(len(self.numbers)):
+            modifierString = self.modifierStrings[i]
+            modifier = Modifier(modifierString)
+            modifiers.append(modifier)
 
-            self.modifiers.append(tuple(modifiers))
+        self.modifiers = tuple(modifiers)
 
     def _getFigures(self) -> None:
         '''
@@ -476,19 +472,18 @@ class Notation(prebase.ProtoM21Object):
         >>> notation2.figures[1]
         <music21.figuredBass.notation.Figure 3 <Modifier - flat>>
         '''
+        figures: list[Figure] = []
 
-        for j, nums in enumerate(self.numbers):
-            figures: list[Figure] = []
-            for i in range(len(nums)):
-                number = nums[i]
-                modifierString = self.modifierStrings[j][i]
-                extender = False
-                if self.extenders and i < len(self.extenders):
-                    extender = self.extenders[i]
-                figure = Figure(number, modifierString, extender=extender)
-                figures.append(figure)
+        for i in range(len(self.numbers)):
+            number = self.numbers[i]
+            modifierString = self.modifierStrings[i]
+            extender = False
+            if self.extenders and i < len(self.extenders):
+                extender = self.extenders[i]
+            figure = Figure(number, modifierString, extender=extender)
+            figures.append(figure)
 
-            self.figures.append(figures)
+        self.figures = figures
 
         figuresFromNotaCol = []
 
@@ -502,7 +497,6 @@ class Notation(prebase.ProtoM21Object):
 
 class NotationException(exceptions21.Music21Exception):
     pass
-
 
 # ------------------------------------------------------------------------------
 
@@ -798,7 +792,6 @@ class Modifier(prebase.ProtoM21Object):
 class ModifierException(exceptions21.Music21Exception):
     pass
 
-
 # ------------------------------------------------------------------------------
 
 # Helper Methods
@@ -836,5 +829,4 @@ class Test(unittest.TestCase):
 
 if __name__ == '__main__':
     import music21
-
     music21.mainTest(Test)

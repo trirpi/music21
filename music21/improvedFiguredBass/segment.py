@@ -98,7 +98,7 @@ class Segment:
 
     @property
     def root_note_pitch_class(self):
-        return self.segmentChord[0].root().ps % 12
+        return self.segmentChord.root().ps % 12
 
     @property
     def is_tonic_chord(self):
@@ -119,12 +119,8 @@ class Segment:
         self.pitchNamesInFigures = self.fbScale.getFigurePitchNames(self.bassNote.pitch, self.notation_string)
 
     def update_pitch_names_in_chord(self, past_measure):
-        newPitchNamesInChord = []
-        for pitch_names in self.pitchNamesInChord:
-            new_in_chord = self.update_pitch_names_in_single_chord(pitch_names, past_measure)
-            newPitchNamesInChord.append(new_in_chord)
         self.pitchNamesInFigures = set(self.update_pitch_names_in_single_chord(self.pitchNamesInFigures, past_measure))
-        self.pitchNamesInChord = newPitchNamesInChord
+        self.pitchNamesInChord = self.update_pitch_names_in_single_chord(self.pitchNamesInChord, past_measure)
 
     def update_pitch_names_in_single_chord(self, pitch_names, past_measure):
         newPitchNamesInChord = []
@@ -137,14 +133,8 @@ class Segment:
         return newPitchNamesInChord
 
     def finish_initialization(self):
-        self.allPitchesAboveBass = [
-            getPitches(pitchNamesInChord, self.bassNote.pitch, self._maxPitch)
-            for pitchNamesInChord in self.pitchNamesInChord
-        ]
-        self.segmentChord = [
-            chord.Chord(allPitchesAboveBass, quarterLength=self.bassNote.quarterLength)
-            for allPitchesAboveBass in self.allPitchesAboveBass
-        ]
+        self.allPitchesAboveBass = getPitches(self.pitchNamesInChord, self.bassNote.pitch, self._maxPitch)
+        self.segmentChord = chord.Chord(self.allPitchesAboveBass, quarterLength=self.bassNote.quarterLength)
         self._environRules = environment.Environment('figuredBass.segment')
 
     def resolveDominantSeventhSegment(self, segmentB):
@@ -442,11 +432,10 @@ class Segment:
         '''
         result = []
         r = rule_set.DYNAMIC_RANGES[self.dynamic]
-        for allPitchesAboveBass in self.allPitchesAboveBass:
-            for i in range(r[0], r[1] + 1):
-                iterables = [allPitchesAboveBass] * (i - 1)
-                iterables.append([pitch.Pitch(self.bassNote.pitch.nameWithOctave)])
-                result += list(itertools.product(*iterables))
+        for i in range(r[0], r[1] + 1):
+            iterables = [self.allPitchesAboveBass] * (i - 1)
+            iterables.append([pitch.Pitch(self.bassNote.pitch.nameWithOctave)])
+            result += list(itertools.product(*iterables))
         return result
 
     def all_filtered_possibilities(self, rule_set: RuleSet):

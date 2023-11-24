@@ -102,20 +102,17 @@ class FiguredBassScale:
                 bassNote.pitch.accidental = self.keySig.accidentalByStep(bassNote.pitch.step)
             bassSD = self.realizerScale.getScaleDegreeFromPitch(bassNote.pitch)
 
-        result = []
-        for numbers, modifiers in zip(nt.numbers, nt.modifiers):
-            pitchNames = []
-            for i in range(len(numbers)):
-                pitchSD = (bassSD + numbers[i] - 1) % 7
-                samplePitch = self.realizerScale.pitchFromDegree(pitchSD)
-                pitchNames.append(samplePitch.name)
-                if modifiers[i].accidental is not None:
-                    self.modify[samplePitch.name] = modifiers[i]
+        pitchNames = []
+        for number, modifier in zip(nt.numbers, nt.modifiers):
+            pitchSD = (bassSD + number - 1) % 7
+            samplePitch = self.realizerScale.pitchFromDegree(pitchSD)
+            pitchNames.append(samplePitch.name)
+            if modifier.accidental is not None:
+                self.modify[samplePitch.name] = modifier
 
-            pitchNames.append(bassPitch.name)
-            pitchNames.reverse()
-            result.append(pitchNames)
-        return result
+        pitchNames.append(bassPitch.name)
+        pitchNames.reverse()
+        return pitchNames
 
     def getFigurePitchNames(self, bassPitch, notationString=None):
         '''

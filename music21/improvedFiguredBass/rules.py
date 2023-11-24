@@ -60,9 +60,8 @@ class RuleSet:
             UpperPartsWithinLimit(cost=2*self.HIGH_COST),
             NotTooLow(cost=self.HIGH_COST),
             IsIncomplete(cost=self.HIGH_COST),
-            AvoidSeventhChord(cost=7),
-            LimitPartToPitch(cost=5),
-            LessNotes(cost=self.LOW_COST),
+            AvoidSeventhChord(cost=self.LOW_COST),
+            UseLeastAmountOfNotes(cost=self.LOW_COST),
             PitchesUnderMelody(cost=0.5 * self.LOW_COST),
         ]
 
@@ -672,13 +671,13 @@ class UnpreparedNote(TransitionRule):
     def has_unprepared_note(self, possib_a, possib_b, segment_b):
         seventh = None
         ninth = None
-        for segmentChord in segment_b.segmentChord:
-            pos = segmentChord.getChordStep(7)
-            if pos:
-                seventh = pos
-            pos = segmentChord.getChordStep(7)
-            if pos:
-                ninth = pos
+        segmentChord = segment_b.segmentChord
+        pos = segmentChord.getChordStep(7)
+        if pos:
+            seventh = pos
+        pos = segmentChord.getChordStep(7)
+        if pos:
+            ninth = pos
         if seventh is not None:
             for n2 in possib_b:
                 if n2.pitchClass == seventh.pitchClass and n2 not in possib_a:
@@ -763,11 +762,9 @@ class HasDuplicate(SingleRule):
 
 class IsIncomplete(SingleRule):
     def get_cost(self, possib, segment):
-        needed_pitch_names = segment.pitchNamesInChord
         melody_notes = segment.melody_pitches
-        for pitch_names in needed_pitch_names:
-            if not self.isIncomplete(possib, pitch_names.copy(), melody_notes):
-                return 0
+        if not self.isIncomplete(possib, segment.pitchNamesInChord.copy(), melody_notes):
+            return 0
         return self.cost
 
     def isIncomplete(self, possibA, pitchNamesToContain, melody_notes):
@@ -882,39 +879,6 @@ class PitchesWithinLimit(SingleRule):
         return True
 
 
-class LimitPartToPitch(SingleRule):
-    def get_cost(self, possib, segment):
-        return self.cost if not self.limitPartToPitch(possib) else 0
-
-    def limitPartToPitch(self, possibA, partPitchLimits=None):
-        '''
-        Takes in a dict, partPitchLimits containing (partNumber, partPitch) pairs, each
-        of which limits a part in possibA to a certain :class:`~music21.pitch.Pitch`.
-        Returns True if all limits are followed in possibA, False otherwise.
-
-        >>> from music21.figuredBass import possibility
-        >>> C4 = pitch.Pitch('C4')
-        >>> E4 = pitch.Pitch('E4')
-        >>> G4 = pitch.Pitch('G4')
-        >>> C5 = pitch.Pitch('C5')
-        >>> G5 = pitch.Pitch('G5')
-        >>> sopranoPitch = pitch.Pitch('G5')
-        >>> possibA1 = (C5, G4, E4, C4)
-        >>> possibility.limitPartToPitch(possibA1, {1: sopranoPitch})
-        False
-        >>> possibA2 = (G5, G4, E4, C4)
-        >>> possibility.limitPartToPitch(possibA2, {1: sopranoPitch})
-        True
-        '''
-        if partPitchLimits is None:
-            partPitchLimits = {}
-        for (partNumber, partPitch) in partPitchLimits.items():
-            if not (possibA[partNumber - 1] == partPitch):
-                return False
-
-        return True
-
-
 class NotTooLow(SingleRule):
     def get_cost(self, possib, segment):
         bass_note = possib[-1]
@@ -925,14 +889,14 @@ class NotTooLow(SingleRule):
 
 class ContainRoot(SingleRule):
     def get_cost(self, possib, segment):
-        root = segment.segmentChord[0].root()
+        root = segment.segmentChord.root()
         for p in possib:
             if (p.ps - root.ps) % 12 == 0:
                 return 0
         return self.cost
 
 
-class LessNotes(SingleRule):
+class UseLeastAmountOfNotes(SingleRule):
     def get_cost(self, possib, segment):
         return max(0, (len(possib) - 2)) * self.cost
 
