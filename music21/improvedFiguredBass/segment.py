@@ -55,7 +55,7 @@ class Segment:
     <music21.note.Note C>
     >>> s1.numParts
     4
-    >>> s1.pitchNamesInChord
+    >>> s1.pitch_names_in_chord
     ['C', 'E', 'G']
     >>> s1.segmentChord
     <music21.chord.Chord C3 E3 G3 C4 E4 G4 C5 E5 G5>
@@ -85,8 +85,9 @@ class Segment:
 
         self.play_offsets = play_offsets
         self.notation_string = notationString
-        self.pitchNamesInChord = None
-        self.pitchNamesInFigures = None # pitch names that are specifically in figures
+        self.alternative_notation_strings = []
+        self.pitch_names_in_chord = None
+        self.pitch_names_in_figures = None # pitch names that are specifically in figures
 
     @property
     def measure_number(self):
@@ -115,12 +116,12 @@ class Segment:
         )
 
     def set_pitch_names_in_chord(self):
-        self.pitchNamesInChord = self.fbScale.getPitchNames(self.bassNote.pitch, self.notation_string)
-        self.pitchNamesInFigures = self.fbScale.getFigurePitchNames(self.bassNote.pitch, self.notation_string)
+        self.pitch_names_in_chord = self.fbScale.getPitchNames(self.bassNote.pitch, self.notation_string)
+        self.pitch_names_in_figures = self.fbScale.getFigurePitchNames(self.bassNote.pitch, self.notation_string)
 
     def update_pitch_names_in_chord(self, past_measure):
-        self.pitchNamesInFigures = set(self.update_pitch_names_in_single_chord(self.pitchNamesInFigures, past_measure))
-        self.pitchNamesInChord = self.update_pitch_names_in_single_chord(self.pitchNamesInChord, past_measure)
+        self.pitch_names_in_figures = set(self.update_pitch_names_in_single_chord(self.pitch_names_in_figures, past_measure))
+        self.pitch_names_in_chord = self.update_pitch_names_in_single_chord(self.pitch_names_in_chord, past_measure)
 
     def update_pitch_names_in_single_chord(self, pitch_names, past_measure):
         newPitchNamesInChord = []
@@ -133,7 +134,7 @@ class Segment:
         return newPitchNamesInChord
 
     def finish_initialization(self):
-        self.allPitchesAboveBass = getPitches(self.pitchNamesInChord, self.bassNote.pitch, self._maxPitch)
+        self.allPitchesAboveBass = getPitches(self.pitch_names_in_chord, self.bassNote.pitch, self._maxPitch)
         self.segmentChord = chord.Chord(self.allPitchesAboveBass, quarterLength=self.bassNote.quarterLength)
         self._environRules = environment.Environment('figuredBass.segment')
 
@@ -323,7 +324,7 @@ class Segment:
 
         >>> from music21.figuredBass import segment
         >>> segmentA = segment.Segment(bassNote=note.Note('A-2'), notationString='#6,b5,3')
-        >>> segmentA.pitchNamesInChord  # spell out a Gr+6 chord
+        >>> segmentA.pitch_names_in_chord  # spell out a Gr+6 chord
         ['A-', 'C', 'E-', 'F#']
         >>> allAugSixthPossib = segmentA.allCorrectSinglePossibilities()
         >>> allAugSixthPossibList = list(allAugSixthPossib)

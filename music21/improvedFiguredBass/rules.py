@@ -763,7 +763,7 @@ class HasDuplicate(SingleRule):
 class IsIncomplete(SingleRule):
     def get_cost(self, possib, segment):
         melody_notes = segment.melody_pitches
-        if not self.isIncomplete(possib, segment.pitchNamesInChord.copy(), melody_notes):
+        if not self.isIncomplete(possib, segment.pitch_names_in_chord.copy(), melody_notes):
             return 0
         return self.cost
 
@@ -903,7 +903,7 @@ class UseLeastAmountOfNotes(SingleRule):
 
 class NotesFromFigures(SingleRule):
     def get_cost(self, possib, segment):
-        needed_pitch_classes = segment.pitchNamesInFigures.copy()
+        needed_pitch_classes = segment.pitch_names_in_figures.copy()
         for p in possib:
             if p.name in needed_pitch_classes:
                 needed_pitch_classes.remove(p.name)
