@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from music21 import voiceLeading, pitch
 from music21.improvedFiguredBass.possibility import Possibility
 from music21.improvedFiguredBass.skip_rules import SkipDecision, SkipRules
+from music21.pitch import Pitch
 
 if TYPE_CHECKING:
     from music21.improvedFiguredBass.segment import Segment
@@ -67,6 +68,24 @@ class RuleSet:
         ]
 
         self.skip_rules = SkipRules()
+
+    @cache
+    def get_cost_with_intermediate(
+        self,
+        possib_a: Possibility, segment_a: 'Segment',
+        possib_b: Possibility, segment_b: 'Segment',
+        intermediate_pitch: Pitch, voice=0, enable_logging=False
+    ):
+        new_pitches = list(possib_a.pitches)
+        new_pitches[voice] = intermediate_pitch
+        new_possib_a = Possibility(tuple(new_pitches))
+        cost = self.get_cost(new_possib_a, segment_a, possib_b, segment_b, enable_logging)
+        if enable_logging:
+            logging.log(
+                logging.INFO,
+                f"with intermediate note {intermediate_pitch}."
+            )
+        return cost
 
     @cache
     def get_cost(self, possib_a, segment_a, possib_b=None, segment_b=None, enable_logging=False):

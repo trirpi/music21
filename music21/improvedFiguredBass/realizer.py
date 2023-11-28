@@ -44,6 +44,8 @@ from music21.improvedFiguredBass import realizer_scale
 from music21.improvedFiguredBass import segment
 from music21.improvedFiguredBass.rules import RuleSet
 from music21.improvedFiguredBass.skip_rules import SkipDecision
+from music21.note import Note
+from music21.pitch import Pitch
 
 
 def figured_bass_from_stream(stream_part) -> FiguredBassLine:
@@ -374,11 +376,17 @@ class Realization:
                     if skip_decision == SkipDecision.SKIP:
                         continue
                     for prev_possib, prev_cost in dp[segment_a_idx].items():
-                        transition_cost = self.rule_set.get_cost(prev_possib, segment_a, possib, segment_b)
                         local_cost_b = segment_b.get_cost(self.rule_set, possib)
+
+                        transition_cost = self.rule_set.get_cost(prev_possib, segment_a, possib, segment_b)
                         new_cost = prev_cost + (num_skips+1)*(transition_cost + local_cost_b)
 
                         best_cost = min(new_cost, best_cost)
+                        for intermediate_note in [Pitch('C4')]:
+                            transition_cost = self.rule_set.get_cost_with_intermediate(
+                                prev_possib, segment_a, possib, segment_b, intermediate_note, 1)
+                            new_cost = prev_cost + (num_skips + 1) * (transition_cost + local_cost_b)
+                            best_cost = min(new_cost, best_cost)
                     if skip_decision == SkipDecision.NO_SKIP:
                         break
 
@@ -393,7 +401,7 @@ class Realization:
         best_possib = min(d, key=d.get)
         final_cost = min(d.values())
         best_cost = final_cost
-        reverse_progression.append((best_possib, 0))
+        reverse_progression.append((best_possib, 0, None))
 
         logging.log(logging.INFO, f"======================================")
         logging.log(logging.INFO, f"Found solution with cost {final_cost}.")
@@ -411,11 +419,23 @@ class Realization:
                     if (num_skips+1) * (transition_cost + to_possib_cost) == best_cost - prev_cost:
                         best_possib = possib_a
                         best_cost = prev_cost
-                        reverse_progression.append((best_possib, num_skips))
+                        reverse_progression.append((best_possib, num_skips, None))
                         logging.log(logging.INFO, f"Chose {best_possib} after skipping {num_skips} notes.")
                         i -= num_skips
                         found = True
                         break
+                    for intermediate_note in [Pitch('C4')]:
+                        transition_cost = self.rule_set.get_cost_with_intermediate(
+                            possib_a, segment_a, best_possib, segment_b, intermediate_note, 1)
+                        if (num_skips+1) * (transition_cost + to_possib_cost) == best_cost - prev_cost:
+                            best_possib = possib_a
+                            best_cost = prev_cost
+                            reverse_progression.append((best_possib, num_skips, intermediate_note))
+                            logging.log(logging.INFO, f"Chose {best_possib} after skipping {num_skips} notes"
+                                                      f"with intermediate note {intermediate_note}.")
+                            i -= num_skips
+                            found = True
+                            break
 
                 if found:
                     break
@@ -425,6 +445,8 @@ class Realization:
     def get_optimal_possibility_progression(self):
         """
         Returns a random unique possibility progression.
+
+        Mutates segment_list
         """
         dp = self.generate_dp_table()
         reverse_progression = self.get_reverse_choices(dp)
@@ -437,8 +459,9 @@ class Realization:
         prev_val = None
         measure = float('inf')
         logging.log(logging.INFO, f"=== START LOG ========================\n")
-        for val, num_skips in reversed(reverse_progression):
+        for val, num_skips, intermediate_note in reversed(reverse_progression):
             curr_segment = self.segment_list[curr_idx]
+            curr_segment.intermediate_note = intermediate_note
             m = curr_segment.measure_number
             if m is not None and m < measure:
                 measure = m
@@ -457,7 +480,6 @@ class Realization:
 
         for i in reversed(idx_to_delete):
             del self.segment_list[i]
-
 
         return result
 
@@ -482,7 +504,15 @@ class Realization:
                 rhPitches = possibA[0:-1]
                 rhChord = chord.Chord(rhPitches)
                 rhChord.quarterLength = self.segment_list[segmentIndex].quarterLength
-                rightHand.append(rhChord)
+                intermediate_note = self.segment_list[segmentIndex].intermediate_note
+                if intermediate_note:
+                    rhChord.quarterLength /= 2
+                    n = Note(intermediate_note)
+                    n.quarterLength = rhChord.quarterLength
+                    rightHand.append(rhChord)
+                    rightHand.append(n)
+                else:
+                    rightHand.append(rhChord)
             rightHand.insert(0.0, clef.TrebleClef())
 
         else:  # Chorale-style output
