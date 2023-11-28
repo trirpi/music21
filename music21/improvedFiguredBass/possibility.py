@@ -6,7 +6,7 @@ if TYPE_CHECKING:
 
 
 class Possibility:
-    def __init__(self, pitches: tuple['Pitch'], option_index: int = 0):
+    def __init__(self, pitches: tuple['Pitch', ...], option_index: int = 0):
         self.pitches = pitches
         self.option_index = option_index
 

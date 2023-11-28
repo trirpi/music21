@@ -22,6 +22,7 @@ from music21.improvedFiguredBass import realizer_scale
 from music21.improvedFiguredBass import resolution
 from music21.improvedFiguredBass.possibility import Possibility
 from music21.improvedFiguredBass.rules import RuleSet
+from music21.interval import Direction
 
 
 class Segment:
@@ -117,6 +118,16 @@ class Segment:
     def update_pitch_names_in_chord(self, past_measure):
         for option in self.segment_options:
             option.update_pitch_names_in_chord(past_measure)
+
+    def get_intermediate_notes(self, possib: 'Possibility'):
+        """Given a possibility returns list pairs of intermediate note and voice."""
+        result = []
+        for voice, pitch in enumerate(possib.pitches):
+            result.append((self.fbScale.realizerScale.nextPitch(pitch), voice))
+            result.append((
+                self.fbScale.realizerScale.nextPitch(pitch, Direction.DESCENDING), voice
+            ))
+        return result
 
     def resolveDominantSeventhSegment(self, segmentB):
         # noinspection PyShadowingNames
