@@ -382,9 +382,9 @@ class Realization:
                         new_cost = prev_cost + (num_skips+1)*(transition_cost + local_cost_b)
 
                         best_cost = min(new_cost, best_cost)
-                        for intermediate_note in [Pitch('C4')]:
+                        for intermediate_pitch, voice in segment_a.get_intermediate_notes(prev_possib):
                             transition_cost = self.rule_set.get_cost_with_intermediate(
-                                prev_possib, segment_a, possib, segment_b, intermediate_note, 1)
+                                prev_possib, segment_a, possib, segment_b, intermediate_pitch, voice)
                             new_cost = prev_cost + (num_skips + 1) * (transition_cost + local_cost_b)
                             best_cost = min(new_cost, best_cost)
                     if skip_decision == SkipDecision.NO_SKIP:
@@ -424,15 +424,15 @@ class Realization:
                         i -= num_skips
                         found = True
                         break
-                    for intermediate_note in [Pitch('C4')]:
+                    for intermediate_pitch, voice in segment_a.get_intermediate_notes(possib_a):
                         transition_cost = self.rule_set.get_cost_with_intermediate(
-                            possib_a, segment_a, best_possib, segment_b, intermediate_note, 1)
+                            possib_a, segment_a, best_possib, segment_b, intermediate_pitch, voice)
                         if (num_skips+1) * (transition_cost + to_possib_cost) == best_cost - prev_cost:
                             best_possib = possib_a
                             best_cost = prev_cost
-                            reverse_progression.append((best_possib, num_skips, intermediate_note))
+                            reverse_progression.append((best_possib, num_skips, intermediate_pitch))
                             logging.log(logging.INFO, f"Chose {best_possib} after skipping {num_skips} notes"
-                                                      f"with intermediate note {intermediate_note}.")
+                                                      f"with intermediate note {intermediate_pitch}.")
                             i -= num_skips
                             found = True
                             break
