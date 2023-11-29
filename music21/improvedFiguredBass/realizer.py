@@ -389,7 +389,7 @@ class Realization:
                             dp_entry[avail][possib] = min(dp_entry[avail][possib], new_cost)
                             best_cost = min(new_cost, best_cost)
                             if prev_avail >= 10:
-                                for intermediate_pitch, voice in segment_a.get_intermediate_notes(prev_possib):
+                                for intermediate_pitch, voice in segment_a.get_intermediate_int_pitches(prev_possib):
                                     transition_cost = self.rule_set.get_cost_with_intermediate(
                                         prev_possib, segment_a, possib, segment_b, intermediate_pitch, voice)
                                     new_cost = prev_cost + (num_skips + 1) * (transition_cost + local_cost_b)
@@ -436,7 +436,7 @@ class Realization:
                             found = True
                             break
                         if prev_avail >= 10:
-                            for intermediate_pitch, voice in segment_a.get_intermediate_notes(possib_a):
+                            for intermediate_pitch, voice in segment_a.get_intermediate_int_pitches(possib_a):
                                 transition_cost = self.rule_set.get_cost_with_intermediate(
                                     possib_a, segment_a, best_possib, segment_b, intermediate_pitch, voice)
                                 if (num_skips+1) * (transition_cost + to_possib_cost) == best_cost - prev_cost:
@@ -513,7 +513,7 @@ class Realization:
             rightHand.append([copy.deepcopy(self._keySig), copy.deepcopy(self._inTime)])
 
             for segmentIndex in range(len(self.segment_list)):
-                possibA = possibility_progression[segmentIndex].pitches
+                possibA = possibility_progression[segmentIndex].get_pitches()
                 bassNote = self.segment_list[segmentIndex].bassNote
                 bassLine.append(copy.deepcopy(bassNote))
                 rhPitches = possibA[0:-1]

@@ -6,7 +6,6 @@ from abc import abstractmethod, ABC
 from functools import cache
 from typing import TYPE_CHECKING
 
-from music21 import voiceLeading, pitch
 from music21.improvedFiguredBass.possibility import Possibility
 from music21.improvedFiguredBass.skip_rules import SkipDecision, SkipRules
 from music21.pitch import Pitch
@@ -76,7 +75,7 @@ class RuleSet:
         possib_b: Possibility, segment_b: 'Segment',
         intermediate_pitch: Pitch, voice=0, enable_logging=False
     ):
-        new_pitches = list(possib_a.pitches)
+        new_pitches = list(possib_a.integer_pitches)
         new_pitches[voice] = intermediate_pitch
         new_possib_a = Possibility(tuple(new_pitches))
         cost = self.get_cost(new_possib_a, segment_a, possib_b, segment_b, enable_logging)
@@ -192,7 +191,7 @@ class TransitionRule(Rule):
 
     @staticmethod
     def distance_between(part_a, part_b):
-        return math.ceil(max(abs(part_a.ps - part_b.ps) / 2 - 1, 0))
+        return math.ceil(max(abs(part_a - part_b) / 2 - 1, 0))
 
 
 class ParallelFifths(TransitionRule):
@@ -201,32 +200,22 @@ class ParallelFifths(TransitionRule):
         return self.cost if self.has_parallel_fifths(possib_a, possib_b) else 0
 
     @cache
-    def has_parallel_fifths(self, possib_a, possib_b):
-        has_parallel_fifths = False
-        pairs_list = self.get_pairs(possib_a.pitches, possib_b.pitches)
+    def has_parallel_fifths(self, possib_a: Possibility, possib_b: Possibility):
+        pairs_list = self.get_pairs(possib_a.integer_pitches, possib_b.integer_pitches)
 
         for pair1Index in range(len(pairs_list)):
             (higherPitchA, higherPitchB) = pairs_list[pair1Index]
             for pair2Index in range(pair1Index + 1, len(pairs_list)):
                 (lowerPitchA, lowerPitchB) = pairs_list[pair2Index]
-                if not abs(higherPitchA.ps - lowerPitchA.ps) % 12 == 7:
-                    continue
-                if not abs(higherPitchB.ps - lowerPitchB.ps) % 12 == 7:
-                    continue
-                # Very high probability of ||5, but still not certain.
-                pitchQuartet = (lowerPitchA, lowerPitchB, higherPitchA, higherPitchB)
-                vlq = voiceLeading.VoiceLeadingQuartet(*pitchQuartet)
-                if vlq.parallelFifth():
-                    has_parallel_fifths = True
-                if has_parallel_fifths:
-                    return has_parallel_fifths
+                if abs(higherPitchA - lowerPitchA) % 12 == 7 and abs(higherPitchB - lowerPitchB) % 12 == 7:
+                    return True
 
-        return has_parallel_fifths
+        return False
 
 
 class ParallelOctaves(TransitionRule):
     def get_cost(self, possib_a, possib_b, segment_a, segment_b):
-        return self.cost if self.has_parallel_octaves(possib_a.pitches, possib_b.pitches) else 0
+        return self.cost if self.has_parallel_octaves(possib_a.integer_pitches, possib_b.integer_pitches) else 0
 
     @cache
     def has_parallel_octaves(self, possibA, possibB):
@@ -247,12 +236,12 @@ class ParallelOctaves(TransitionRule):
         as two shared parts with parallel octaves are found.
 
         >>> from music21.figuredBass import possibility
-        >>> C3 = pitch.Pitch('C3')
-        >>> D3 = pitch.Pitch('D3')
-        >>> G3 = pitch.Pitch('G3')
-        >>> A3 = pitch.Pitch('A3')
-        >>> C4 = pitch.Pitch('C4')
-        >>> D4 = pitch.Pitch('D4')
+        >>> C3 = Pitch('C3')
+        >>> D3 = Pitch('D3')
+        >>> G3 = Pitch('G3')
+        >>> A3 = Pitch('A3')
+        >>> C4 = Pitch('C4')
+        >>> D4 = Pitch('D4')
 
 
         Here, the soprano moves from C4 to D4 and the bass moves
@@ -276,38 +265,33 @@ class ParallelOctaves(TransitionRule):
         and tenor!)
 
 
-        >>> B3 = pitch.Pitch('B3')
+        >>> B3 = Pitch('B3')
         >>> possibA2 = (C4, G3, C3)
         >>> possibB2 = (B3, A3, D3)
         >>> possibility.parallelOctaves(possibA2, possibB2)
         False
         '''
-        hasParallelOctaves = False
         pairsList = self.get_pairs(possibA, possibB)
 
         for pair1Index in range(len(pairsList)):
             (higherPitchA, higherPitchB) = pairsList[pair1Index]
             for pair2Index in range(pair1Index + 1, len(pairsList)):
                 (lowerPitchA, lowerPitchB) = pairsList[pair2Index]
-                if not abs(higherPitchA.ps - lowerPitchA.ps) % 12 == 0:
-                    continue
-                if not abs(higherPitchB.ps - lowerPitchB.ps) % 12 == 0:
-                    continue
-                # Very high probability of ||8, but still not certain.
-                pitchQuartet = (lowerPitchA, lowerPitchB, higherPitchA, higherPitchB)
-                vlq = voiceLeading.VoiceLeadingQuartet(*pitchQuartet)
-                if vlq.parallelOctave():
-                    hasParallelOctaves = True
-                if hasParallelOctaves:
-                    return hasParallelOctaves
+                if abs(higherPitchA - lowerPitchA) % 12 == 0 and abs(higherPitchB - lowerPitchB) % 12 == 0:
+                    return True
+        return False
 
-        return hasParallelOctaves
+
+def has_similar_motion(a1, a2, b1, b2):
+    diff_h = a1 - a2
+    diff_l = b1 - b2
+    return ((diff_l > 0) == (diff_h > 0)) and diff_l != 0 and diff_h != 0
 
 
 class HiddenFifth(TransitionRule):
 
     def get_cost(self, possib_a, possib_b, segment_a, segment_b):
-        return self.cost if self.has_hidden_fifth(possib_a.pitches, possib_b.pitches) else 0
+        return self.cost if self.has_hidden_fifth(possib_a.integer_pitches, possib_b.integer_pitches) else 0
 
     @cache
     def has_hidden_fifth(self, possibA, possibB):
@@ -323,12 +307,12 @@ class HiddenFifth(TransitionRule):
         then this constitutes a hidden octave between the two possibilities.
 
         >>> from music21.figuredBass import possibility
-        >>> C3 = pitch.Pitch('C3')
-        >>> D3 = pitch.Pitch('D3')
-        >>> E3 = pitch.Pitch('E3')
-        >>> F3 = pitch.Pitch('F3')
-        >>> E5 = pitch.Pitch('E5')
-        >>> A5 = pitch.Pitch('A5')
+        >>> C3 = Pitch('C3')
+        >>> D3 = Pitch('D3')
+        >>> E3 = Pitch('E3')
+        >>> F3 = Pitch('F3')
+        >>> E5 = Pitch('E5')
+        >>> A5 = Pitch('A5')
 
 
         Here, the bass part moves up from C3 to D3 and the soprano part moves
@@ -347,7 +331,7 @@ class HiddenFifth(TransitionRule):
         there is no hidden fifth.
 
 
-        >>> Ab5 = pitch.Pitch('A-5')
+        >>> Ab5 = Pitch('A-5')
         >>> possibA2 = (E5, E3, C3)
         >>> possibB2 = (Ab5, F3, D3)
         >>> possibility.hiddenFifth(possibA2, possibB2)
@@ -359,30 +343,23 @@ class HiddenFifth(TransitionRule):
         soprano moves down. Therefore, there is no hidden fifth.
 
 
-        >>> E6 = pitch.Pitch('E6')
+        >>> E6 = Pitch('E6')
         >>> possibA3 = (E6, E3, C3)
         >>> possibB3 = (A5, F3, D3)
         >>> possibility.hiddenFifth(possibA3, possibB3)
         False
         '''
-        hasHiddenFifth = False
         pairsList = self.get_pairs(possibA, possibB)
         (highestPitchA, highestPitchB) = pairsList[0]
         (lowestPitchA, lowestPitchB) = pairsList[-1]
 
-        if abs(highestPitchB.ps - lowestPitchB.ps) % 12 == 7:
-            # Very high probability of hidden fifth, but still not certain.
-            pitchQuartet = (lowestPitchA, lowestPitchB, highestPitchA, highestPitchB)
-            vlq = voiceLeading.VoiceLeadingQuartet(*pitchQuartet)
-            if vlq.hiddenFifth():
-                hasHiddenFifth = True
-
-        return hasHiddenFifth
+        similar_motion = has_similar_motion(highestPitchA, highestPitchB, lowestPitchA, lowestPitchB)
+        return abs(highestPitchB - lowestPitchB) % 12 == 7 and similar_motion
 
 
 class HiddenOctave(TransitionRule):
     def get_cost(self, possib_a, possib_b, segment_a, segment_b):
-        return self.cost if self.has_hidden_octave(possib_a.pitches, possib_b.pitches) else 0
+        return self.cost if self.has_hidden_octave(possib_a.integer_pitches, possib_b.integer_pitches) else 0
 
     @cache
     def has_hidden_octave(self, possibA, possibB):
@@ -398,12 +375,12 @@ class HiddenOctave(TransitionRule):
         then this constitutes a hidden octave between the two possibilities.
 
         >>> from music21.figuredBass import possibility
-        >>> C3 = pitch.Pitch('C3')
-        >>> D3 = pitch.Pitch('D3')
-        >>> E3 = pitch.Pitch('E3')
-        >>> F3 = pitch.Pitch('F3')
-        >>> A5 = pitch.Pitch('A5')
-        >>> D6 = pitch.Pitch('D6')
+        >>> C3 = Pitch('C3')
+        >>> D3 = Pitch('D3')
+        >>> E3 = Pitch('E3')
+        >>> F3 = Pitch('F3')
+        >>> A5 = Pitch('A5')
+        >>> D6 = Pitch('D6')
 
 
         Here, the bass part moves up from C3 to D3 and the soprano part moves
@@ -422,30 +399,23 @@ class HiddenOctave(TransitionRule):
         contrary motion.
 
 
-        >>> A6 = pitch.Pitch('A6')
+        >>> A6 = Pitch('A6')
         >>> possibA2 = (A6, E3, C3)
         >>> possibB2 = (D6, F3, D3)
         >>> possibility.hiddenOctave(possibA2, possibB2)
         False
         '''
-        hasHiddenOctave = False
         pairsList = self.get_pairs(possibA, possibB)
         (highestPitchA, highestPitchB) = pairsList[0]
         (lowestPitchA, lowestPitchB) = pairsList[-1]
 
-        if abs(highestPitchB.ps - lowestPitchB.ps) % 12 == 0:
-            # Very high probability of hidden octave, but still not certain.
-            pitchQuartet = (lowestPitchA, lowestPitchB, highestPitchA, highestPitchB)
-            vlq = voiceLeading.VoiceLeadingQuartet(*pitchQuartet)
-            if vlq.hiddenOctave():
-                hasHiddenOctave = True
-
-        return hasHiddenOctave
+        similar_motion = has_similar_motion(highestPitchA, highestPitchB, lowestPitchA, lowestPitchB)
+        return abs(highestPitchB - lowestPitchB) % 12 == 0 and similar_motion
 
 
 class VoiceOverlap(TransitionRule):
     def get_cost(self, possib_a, possib_b, segment_a, segment_b):
-        return self.cost if self.has_voice_overlap(possib_a.pitches, possib_b.pitches) else 0
+        return self.cost if self.has_voice_overlap(possib_a.integer_pitches, possib_b.integer_pitches) else 0
 
     @cache
     def has_voice_overlap(self, possib_a, possib_b):
@@ -482,12 +452,12 @@ class VoiceOverlap(TransitionRule):
         because the bass in possibB would be higher than the soprano in possibA.
 
         >>> from music21.figuredBass import possibility
-        >>> C4 = pitch.Pitch('C4')
-        >>> D4 = pitch.Pitch('D4')
-        >>> E4 = pitch.Pitch('E4')
-        >>> F4 = pitch.Pitch('F4')
-        >>> G4 = pitch.Pitch('G4')
-        >>> C5 = pitch.Pitch('C5')
+        >>> C4 = Pitch('C4')
+        >>> D4 = Pitch('D4')
+        >>> E4 = Pitch('E4')
+        >>> F4 = Pitch('F4')
+        >>> G4 = Pitch('G4')
+        >>> C5 = Pitch('C5')
 
 
         Here, case #2 is demonstrated. There is overlap between the soprano and
@@ -506,7 +476,7 @@ class VoiceOverlap(TransitionRule):
         Now, there is no voice overlap.
 
 
-        >>> B4 = pitch.Pitch('B4')
+        >>> B4 = Pitch('B4')
         >>> possibA2 = (C5, G4, E4, C4)
         >>> possibB2 = (B4, F4, D4, D4)
         >>> possibility.voiceOverlap(possibA2, possibB2)
@@ -528,7 +498,7 @@ class VoiceOverlap(TransitionRule):
 
 class MinimizeMovementsMiddleVoices(TransitionRule):
     def get_cost(self, possib_a, possib_b, segment_a, segment_b):
-        return self.get_cached_cost(possib_a.pitches, possib_b.pitches)
+        return self.get_cached_cost(possib_a.integer_pitches, possib_b.integer_pitches)
 
     @cache
     def get_cached_cost(self, possib_a, possib_b):
@@ -541,7 +511,7 @@ class MinimizeMovementsMiddleVoices(TransitionRule):
 
 class MinimizeMovementsSopranoVoice(TransitionRule):
     def get_cost(self, possib_a, possib_b, segment_a, segment_b):
-        diff = self.distance_between(possib_a.pitches[0], possib_b.pitches[0])
+        diff = self.distance_between(possib_a.integer_pitches[0], possib_b.integer_pitches[0])
         if diff == 0 and self.cost == float('inf'):
             return 0
         else:
@@ -549,7 +519,7 @@ class MinimizeMovementsSopranoVoice(TransitionRule):
 
     @staticmethod
     def distance_between(part_a, part_b):
-        return abs(part_a.ps - part_b.ps)
+        return abs(part_a - part_b)
 
 
 class PartMovementsWithinLimits(TransitionRule):
@@ -560,7 +530,6 @@ class PartMovementsWithinLimits(TransitionRule):
     def get_cost(self, possib_a, possib_b, segment_a, segment_b):
         return self.cost if not self.part_movements_within_limits(possib_a.pitches, possib_b.pitches) else 0
 
-    @cache
     def part_movements_within_limits(self, possibA, possibB):
         # noinspection PyShadowingNames
         '''
@@ -575,14 +544,14 @@ class PartMovementsWithinLimits(TransitionRule):
           between a pitch in possibA and a corresponding pitch in possibB, in semitones.
 
         >>> from music21.figuredBass import possibility
-        >>> C4 = pitch.Pitch('C4')
-        >>> D4 = pitch.Pitch('D4')
-        >>> E4 = pitch.Pitch('E4')
-        >>> F4 = pitch.Pitch('F4')
-        >>> G4 = pitch.Pitch('G4')
-        >>> A4 = pitch.Pitch('A4')
-        >>> B4 = pitch.Pitch('B4')
-        >>> C5 = pitch.Pitch('C5')
+        >>> C4 = Pitch('C4')
+        >>> D4 = Pitch('D4')
+        >>> E4 = Pitch('E4')
+        >>> F4 = Pitch('F4')
+        >>> G4 = Pitch('G4')
+        >>> A4 = Pitch('A4')
+        >>> B4 = Pitch('B4')
+        >>> C5 = Pitch('C5')
 
         Here, we limit the soprano part to motion of two semitones,
         enharmonically equivalent to a major second.
@@ -614,20 +583,19 @@ class UpperPartsSame(TransitionRule):
     def get_cost(self, possib_a, possib_b, segment_a, segment_b):
         return self.cost if not self.upper_parts_same(possib_a.pitches, possib_b.pitches) else 0
 
-    @cache
     def upper_parts_same(self, possibA, possibB):
         '''
         Returns True if the upper parts are the same.
         False otherwise.
 
         >>> from music21.figuredBass import possibility
-        >>> C4 = pitch.Pitch('C4')
-        >>> D4 = pitch.Pitch('D4')
-        >>> E4 = pitch.Pitch('E4')
-        >>> F4 = pitch.Pitch('F4')
-        >>> G4 = pitch.Pitch('G4')
-        >>> B4 = pitch.Pitch('B4')
-        >>> C5 = pitch.Pitch('C5')
+        >>> C4 = Pitch('C4')
+        >>> D4 = Pitch('D4')
+        >>> E4 = Pitch('E4')
+        >>> F4 = Pitch('F4')
+        >>> G4 = Pitch('G4')
+        >>> B4 = Pitch('B4')
+        >>> C5 = Pitch('C5')
         >>> possibA1 = (C5, G4, E4, C4)
         >>> possibB1 = (B4, F4, D4, D4)
         >>> possibB2 = (C5, G4, E4, D4)
@@ -653,18 +621,17 @@ class PartsSame(TransitionRule):
     def get_cost(self, possib_a, possib_b, segment_a, segment_b):
         return self.cost if not self.are_parts_same(possib_a, possib_b) else 0
 
-    @cache
     def are_parts_same(self, possib_a, possib_b):
         '''
         Takes in partsToCheck, a list of part numbers. Checks if pitches at those part numbers of
         possibA and possibB are equal, determined by pitch space.
 
         >>> from music21.figuredBass import possibility
-        >>> C4 = pitch.Pitch('C4')
-        >>> E4 = pitch.Pitch('E4')
-        >>> G4 = pitch.Pitch('G4')
-        >>> B4 = pitch.Pitch('B4')
-        >>> C5 = pitch.Pitch('C5')
+        >>> C4 = Pitch('C4')
+        >>> E4 = Pitch('E4')
+        >>> G4 = Pitch('G4')
+        >>> B4 = Pitch('B4')
+        >>> C5 = Pitch('C5')
         >>> possibA1 = (C5, G4, E4, C4)
         >>> possibB1 = (B4, G4, E4, C4)
         >>> possibility.partsSame(possibA1, possibB1, [2, 3, 4])
@@ -687,7 +654,6 @@ class UnpreparedNote(TransitionRule):
     def get_cost(self, possib_a, possib_b, segment_a, segment_b):
         return self.cost if self.has_unprepared_note(possib_a, possib_b, segment_b) else 0
 
-    @cache
     def has_unprepared_note(self, possib_a, possib_b, segment_b):
         seventh = None
         ninth = None
@@ -699,20 +665,20 @@ class UnpreparedNote(TransitionRule):
         if pos:
             ninth = pos
         if seventh is not None:
-            for n2 in possib_b.pitches:
-                if n2.pitchClass == seventh.pitchClass and n2 not in possib_a.pitches:
+            for n2 in possib_b.get_pitches():
+                if n2.pitchClass == seventh.pitchClass and int(n2.ps) not in possib_a.integer_pitches:
                     return True
 
         if ninth is not None:
-            for n2 in possib_b.pitches:
-                if n2.pitchClass == ninth.pitchClass and n2 not in possib_a.pitches:
+            for n2 in possib_b.get_pitches():
+                if n2.pitchClass == ninth.pitchClass and int(n2.ps) not in possib_a.integer_pitches:
                     return True
         return False
 
 
 class CounterMovement(TransitionRule):
     def get_cost(self, possib_a, possib_b, segment_a, segment_b):
-        possib_a, possib_b = possib_a.pitches, possib_b.pitches
+        possib_a, possib_b = possib_a.integer_pitches, possib_b.integer_pitches
         if possib_a[0] > possib_b[0] and possib_a[-1] < possib_b[-1]:
             return 0
         return self.cost
@@ -730,7 +696,7 @@ class AvoidSeventhChord(SingleRule):
         if len(segment_option.segment_chord) <= 1:
             return 0
         classes = [p.pitchClass for p in segment_option.segment_chord[0].pitches]
-        for pitch in possib.pitches:
+        for pitch in possib.get_pitches():
             if pitch.pitchClass not in classes:
                 return self.cost
         return 0
@@ -740,24 +706,24 @@ class IsPlayable(SingleRule):
     def get_cost(self, possib, segment):
         return self.cost if not self.is_playable(possib) else 0
 
-    @cache
     def is_playable(self, possib):
-        if len(possib.pitches) < 5:
-            return self.playable_by_one_hand(possib.pitches[:-1])
+        if len(possib.integer_pitches) < 5:
+            return self.playable_by_one_hand(possib.integer_pitches[:-1])
         else:
-            return self.playable_by_one_hand(possib.pitches[:-2]) and self.playable_by_one_hand(possib.pitches[-2:])
+            return (self.playable_by_one_hand(possib.integer_pitches[:-2])
+                    and self.playable_by_one_hand(possib.integer_pitches[-2:]))
 
     @staticmethod
     def playable_by_one_hand(notes):
-        return notes[0].ps - notes[-1].ps <= 12
+        return notes[0] - notes[-1] <= 12
 
 
 class NoSmallSecondInterval(SingleRule):
     def get_cost(self, possib, segment):
-        for i in range(len(possib.pitches) - 1):
-            p1 = possib.pitches[i]
-            p2 = possib.pitches[i + 1]
-            if p1.ps - p2.ps <= 1:
+        for i in range(len(possib.integer_pitches) - 1):
+            p1 = possib.integer_pitches[i]
+            p2 = possib.integer_pitches[i + 1]
+            if p1 - p2 <= 1:
                 return self.cost
         return 0
 
@@ -767,10 +733,10 @@ class VoiceCrossing(SingleRule):
         return self.cost if self.voice_crossing(possib) else 0
 
     def voice_crossing(self, possib):
-        for part1Index in range(len(possib.pitches)):
-            higherPitch = possib.pitches[part1Index]
-            for part2Index in range(part1Index + 1, len(possib.pitches)):
-                lowerPitch = possib.pitches[part2Index]
+        for part1Index in range(len(possib.integer_pitches)):
+            higherPitch = possib.integer_pitches[part1Index]
+            for part2Index in range(part1Index + 1, len(possib.integer_pitches)):
+                lowerPitch = possib.integer_pitches[part2Index]
                 if higherPitch < lowerPitch:
                     return True
 
@@ -779,14 +745,14 @@ class VoiceCrossing(SingleRule):
 
 class HasDuplicate(SingleRule):
     def get_cost(self, possib, segment):
-        return self.cost if len(possib.pitches) != len(set(possib.pitches)) else 0
+        return self.cost if len(possib.integer_pitches) != len(set(possib.integer_pitches)) else 0
 
 
 class IsIncomplete(SingleRule):
     def get_cost(self, possib, segment):
         segment_option = possib.get_segment_option(segment)
         melody_notes = segment.melody_pitches
-        if not self.isIncomplete(possib.pitches, segment_option.pitch_names_in_chord.copy(), melody_notes):
+        if not self.isIncomplete(possib.get_pitches(), segment_option.pitch_names_in_chord.copy(), melody_notes):
             return 0
         return self.cost
 
@@ -812,7 +778,7 @@ class IsIncomplete(SingleRule):
 
 class UpperPartsWithinLimit(SingleRule):
     def get_cost(self, possib, segment):
-        return self.cost if not self.upperPartsWithinLimit(possib.pitches) else 0
+        return self.cost if not self.upperPartsWithinLimit(possib.integer_pitches) else 0
 
     def upperPartsWithinLimit(self, possibA, maxSemitoneSeparation=12):
         '''
@@ -827,11 +793,11 @@ class UpperPartsWithinLimit(SingleRule):
         just the right hand.
 
         >>> from music21.figuredBass import possibility
-        >>> C3 = pitch.Pitch('C3')
-        >>> E3 = pitch.Pitch('E3')
-        >>> E4 = pitch.Pitch('E4')
-        >>> G4 = pitch.Pitch('G4')
-        >>> C5 = pitch.Pitch('C5')
+        >>> C3 = Pitch('C3')
+        >>> E3 = Pitch('E3')
+        >>> E4 = Pitch('E4')
+        >>> G4 = Pitch('G4')
+        >>> C5 = Pitch('C5')
         >>> possibA1 = (C5, G4, E4, C3)
         >>> possibility.upperPartsWithinLimit(possibA1)
         True
@@ -847,7 +813,7 @@ class UpperPartsWithinLimit(SingleRule):
 
         if len(possibA) < 3:
             return True
-        return possibA[0].ps - possibA[-2].ps <= maxSemitoneSeparation
+        return possibA[0] - possibA[-2] <= maxSemitoneSeparation
 
 
 class PitchesUnderMelody(SingleRule):
@@ -855,19 +821,19 @@ class PitchesUnderMelody(SingleRule):
         melody_notes = segment.melody_pitches
         if not melody_notes:
             return 0
-        return max(0, self.cost * (possib.pitches[0].ps - min([note.pitch.ps for note in melody_notes])))
+        return max(0, self.cost * (possib.integer_pitches[0] - min([note.pitch.ps for note in melody_notes])))
 
 
 class PitchesWithinLimit(SingleRule):
     def get_cost(self, possib, segment):
-        return self.cost if not self.pitchesWithinLimit(possib.pitches) else 0
+        return self.cost if not self.pitchesWithinLimit(possib.integer_pitches) else 0
 
-    def pitchesWithinLimit(self, possibA, maxPitch=pitch.Pitch('B5'), minRightHandPitch=pitch.Pitch('A3')):
+    def pitchesWithinLimit(self, possibA, maxPitch=Pitch('B5').ps, minRightHandPitch=Pitch('A3').ps):
         '''
         Returns True if all pitches in possibA are less than or equal to
         the maxPitch provided. Comparisons between pitches are done using pitch
         comparison methods, which are based on pitch space values
-        (see :class:`~music21.pitch.Pitch`).
+        (see :class:`~music21.Pitch`).
 
 
         Used in :class:`~music21.figuredBass.segment.Segment` to filter
@@ -877,16 +843,16 @@ class PitchesWithinLimit(SingleRule):
 
         >>> from music21.figuredBass import possibility
         >>> from music21.figuredBass import resolution
-        >>> G2 = pitch.Pitch('G2')
-        >>> D4 = pitch.Pitch('D4')
-        >>> F5 = pitch.Pitch('F5')
-        >>> B5 = pitch.Pitch('B5')
+        >>> G2 = Pitch('G2')
+        >>> D4 = Pitch('D4')
+        >>> F5 = Pitch('F5')
+        >>> B5 = Pitch('B5')
         >>> domPossib = (B5, F5, D4, G2)
         >>> possibility.pitchesWithinLimit(domPossib)
         True
         >>> resPossib = resolution.dominantSeventhToMajorTonic(domPossib)
         >>> resPossib  # Contains C6 > B5
-        (<music21.pitch.Pitch C6>, <music21.pitch.Pitch E5>, <music21.pitch.Pitch C4>, <music21.pitch.Pitch C3>)
+        (<music21.Pitch C6>, <music21.Pitch E5>, <music21.Pitch C4>, <music21.Pitch C3>)
         >>> possibility.pitchesWithinLimit(resPossib)
         False
         '''
@@ -903,9 +869,11 @@ class PitchesWithinLimit(SingleRule):
 
 
 class NotTooLow(SingleRule):
+    C3_INTEGER_PITCH = int(Pitch("C3").ps)
+
     def get_cost(self, possib, segment):
-        bass_note = possib.pitches[-1]
-        if bass_note <= pitch.Pitch("C3") and possib.pitches[-2].ps - bass_note.ps < 7:
+        bass_note = possib.integer_pitches[-1]
+        if bass_note <= self.C3_INTEGER_PITCH and possib.integer_pitches[-2] - bass_note < 7:
             return self.cost
         return 0
 
@@ -914,33 +882,33 @@ class ContainRoot(SingleRule):
     def get_cost(self, possib, segment):
         segment_option = possib.get_segment_option(segment)
         root = segment_option.segment_chord.root()
-        for p in possib.pitches:
-            if (p.ps - root.ps) % 12 == 0:
+        for p in possib.integer_pitches:
+            if (p - root.ps) % 12 == 0:
                 return 0
         return self.cost
 
 
 class UseLeastAmountOfNotes(SingleRule):
     def get_cost(self, possib, segment):
-        return max(0, (len(possib.pitches) - 2)) * self.cost
+        return max(0, (len(possib.integer_pitches) - 2)) * self.cost
 
 
 class NotesFromFigures(SingleRule):
     def get_cost(self, possib: Possibility, segment):
         segment_option = possib.get_segment_option(segment)
-        needed_pitch_classes = segment_option.pitch_names_in_figures.copy()
-        for p in possib.pitches:
-            if p.name in needed_pitch_classes:
-                needed_pitch_classes.remove(p.name)
+        needed_pitch_classes = set(int(Pitch(p).ps) % 12 for p in segment_option.pitch_names_in_figures)
+        for p in possib.integer_pitches:
+            if p % 12 in needed_pitch_classes:
+                needed_pitch_classes.remove(p % 12)
         return 0 if len(needed_pitch_classes) == 0 else self.cost
 
 
 class DoubleRootIfCadence(SingleRule):
     def get_cost(self, possib, segment):
         if segment.ends_cadence:
-            root_pitch = possib.pitches[-1]
-            for pitch in possib.pitches[:-1]:
-                if pitch.name == root_pitch.name:
+            root_pitch = possib.integer_pitches[-1]
+            for pitch in possib.integer_pitches[:-1]:
+                if pitch - root_pitch % 12 == 0:
                     return 0
             return self.cost
         return 0
@@ -968,19 +936,19 @@ def partPairs(possibA, possibB):
     constituting a shared part.
 
     >>> from music21.figuredBass import possibility
-    >>> C4 = pitch.Pitch('C4')
-    >>> D4 = pitch.Pitch('D4')
-    >>> E4 = pitch.Pitch('E4')
-    >>> F4 = pitch.Pitch('F4')
-    >>> G4 = pitch.Pitch('G4')
-    >>> B4 = pitch.Pitch('B4')
-    >>> C5 = pitch.Pitch('C5')
+    >>> C4 = Pitch('C4')
+    >>> D4 = Pitch('D4')
+    >>> E4 = Pitch('E4')
+    >>> F4 = Pitch('F4')
+    >>> G4 = Pitch('G4')
+    >>> B4 = Pitch('B4')
+    >>> C5 = Pitch('C5')
     >>> possibA1 = (C5, G4, E4, C4)
     >>> possibB1 = (B4, F4, D4, D4)
     >>> possibility.partPairs(possibA1, possibA1)
-    [(<music21.pitch.Pitch C5>, <music21.pitch.Pitch C5>), (<music21.pitch.Pitch G4>, <music21.pitch.Pitch G4>), (<music21.pitch.Pitch E4>, <music21.pitch.Pitch E4>), (<music21.pitch.Pitch C4>, <music21.pitch.Pitch C4>)]
+    [(<music21.Pitch C5>, <music21.Pitch C5>), (<music21.Pitch G4>, <music21.Pitch G4>), (<music21.Pitch E4>, <music21.Pitch E4>), (<music21.Pitch C4>, <music21.Pitch C4>)]
     >>> possibility.partPairs(possibA1, possibB1)
-    [(<music21.pitch.Pitch C5>, <music21.pitch.Pitch B4>), (<music21.pitch.Pitch G4>, <music21.pitch.Pitch F4>), (<music21.pitch.Pitch E4>, <music21.pitch.Pitch D4>), (<music21.pitch.Pitch C4>, <music21.pitch.Pitch D4>)]
+    [(<music21.Pitch C5>, <music21.Pitch B4>), (<music21.Pitch G4>, <music21.Pitch F4>), (<music21.Pitch E4>, <music21.Pitch D4>), (<music21.Pitch C4>, <music21.Pitch D4>)]
 
     '''
     return list(zip(possibA, possibB))

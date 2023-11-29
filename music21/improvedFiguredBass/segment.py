@@ -22,7 +22,6 @@ from music21.improvedFiguredBass import realizer_scale
 from music21.improvedFiguredBass import resolution
 from music21.improvedFiguredBass.possibility import Possibility
 from music21.improvedFiguredBass.rules import RuleSet
-from music21.interval import Direction
 
 
 class Segment:
@@ -73,6 +72,7 @@ class Segment:
         self.bassNote = note.Note(bassNote) if isinstance(bassNote, str) else bassNote
         self._maxPitch = pitch.Pitch(maxPitch) if isinstance(maxPitch, str) else maxPitch
         self.fbScale = fbScale
+        self.scale_pitch_classes = set(int(p.ps) % 12 for p in self.fbScale.realizerScale.getPitches("C3", "C4"))
 
         self._specialResolutionRuleChecking = None
         self._singlePossibilityRuleChecking = None
@@ -119,14 +119,14 @@ class Segment:
         for option in self.segment_options:
             option.update_pitch_names_in_chord(past_measure)
 
-    def get_intermediate_notes(self, possib: 'Possibility'):
-        """Given a possibility returns list pairs of intermediate note and voice."""
+    def get_intermediate_int_pitches(self, possib: 'Possibility'):
+        """Given a possibility returns list pairs of intermediate note pitch and voice."""
         result = []
-        for voice, pitch in enumerate(possib.pitches):
-            result.append((self.fbScale.realizerScale.nextPitch(pitch), voice))
-            result.append((
-                self.fbScale.realizerScale.nextPitch(pitch, Direction.DESCENDING), voice
-            ))
+        for voice, int_pitch in enumerate(possib.integer_pitches):
+            pitch_above = int_pitch+1 if int_pitch in self.scale_pitch_classes else int_pitch+2
+            result.append((pitch_above, voice))
+            pitch_below = int_pitch-1 if int_pitch in self.scale_pitch_classes else int_pitch-2
+            result.append((pitch_below, voice))
         return result
 
     def resolveDominantSeventhSegment(self, segmentB):
@@ -418,6 +418,8 @@ class SegmentOption:
 
         self.all_pitches_above_bass = None
         self.segment_chord = None
+
+        self.needed_pitch_classes = set()
 
         self.index = index
 
