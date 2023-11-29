@@ -675,7 +675,7 @@ class UnpreparedNote(TransitionRule):
 class CounterMovement(TransitionRule):
     def get_cost(self, possib_a, possib_b, segment_a, segment_b):
         possib_a, possib_b = possib_a.integer_pitches, possib_b.integer_pitches
-        if possib_a[0] > possib_b[0] and possib_a[-1] < possib_b[-1]:
+        if not has_similar_motion(possib_a[0], possib_b[0], possib_a[-1], possib_b[-1]):
             return 0
         return self.cost
 
