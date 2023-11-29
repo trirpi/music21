@@ -917,17 +917,27 @@ class DoubleRootIfCadence(SingleRule):
 
 class OnlyAllowSixOptionAfterCadence(SingleRule):
     def get_cost(self, possib: Possibility, segment):
-        if segment.prev_segment is None: return 0
+        if segment.prev_segment is None:
+            return 0
         if segment.notation_strings[0] is None and possib.option_index != 0:
             if segment.prev_segment.ends_cadence:
                 jump_down = segment.bassNote.pitch.ps - segment.prev_segment.bassNote.pitch.ps
                 if jump_down != 1:
                     return self.cost
-        if segment.notation_strings[0] is None and possib.option_index == 0:
+                else:
+                    return 0
+            else:
+                return self.cost
+        elif segment.notation_strings[0] is None and possib.option_index == 0:
             if segment.prev_segment.ends_cadence:
                 jump_down = segment.bassNote.pitch.ps - segment.prev_segment.bassNote.pitch.ps
                 if jump_down == 1:
                     return self.cost
+                else:
+                    return 0
+            else:
+                return 0
+
         return 0
 
 
