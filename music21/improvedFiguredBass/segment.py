@@ -122,10 +122,10 @@ class Segment:
     def get_intermediate_int_pitches(self, possib: 'Possibility'):
         """Given a possibility returns list pairs of intermediate note pitch and voice."""
         result = []
-        for voice, int_pitch in enumerate(possib.integer_pitches):
-            pitch_above = int_pitch+1 if int_pitch in self.scale_pitch_classes else int_pitch+2
+        for voice, int_pitch in enumerate(possib.integer_pitches[:-1]):
+            pitch_above = int_pitch+1 if (int_pitch+1) % 12 in self.scale_pitch_classes else int_pitch+2
             result.append((pitch_above, voice))
-            pitch_below = int_pitch-1 if int_pitch in self.scale_pitch_classes else int_pitch-2
+            pitch_below = int_pitch-1 if (int_pitch-1) % 12 in self.scale_pitch_classes else int_pitch-2
             result.append((pitch_below, voice))
         return result
 
@@ -511,6 +511,7 @@ class SegmentOption:
 
     def get_cost(self, rul_set, possib):
         return rul_set.get_cost(possib, self)
+
 
 def getPitches(pitchNames=('C', 'E', 'G'), bassPitch: str | pitch.Pitch = 'C3', maxPitch: str | pitch.Pitch = 'C8'):
     """

@@ -444,7 +444,7 @@ class Realization:
                                     best_cost = prev_cost
                                     reverse_progression.append((best_possib, num_skips, intermediate_pitch))
                                     logging.log(logging.INFO, f"Chose {best_possib} after skipping {num_skips} notes"
-                                                              f"with intermediate note {intermediate_pitch}.")
+                                                              f" with intermediate note {intermediate_pitch}.")
                                     i -= num_skips
                                     found = True
                                     break
@@ -514,20 +514,21 @@ class Realization:
 
             for segmentIndex in range(len(self.segment_list)):
                 possibA = possibility_progression[segmentIndex].get_pitches()
-                bassNote = self.segment_list[segmentIndex].bassNote
-                bassLine.append(copy.deepcopy(bassNote))
+                for p in possibA:
+                    p.accidental.displayStatus = False
+                bassNote = copy.deepcopy(self.segment_list[segmentIndex].bassNote)
+                bassLine.append(bassNote)
                 rhPitches = possibA[0:-1]
                 rhChord = chord.Chord(rhPitches)
                 rhChord.quarterLength = self.segment_list[segmentIndex].quarterLength
                 intermediate_note = self.segment_list[segmentIndex].intermediate_note
+                rightHand.append(rhChord)
                 if intermediate_note:
                     rhChord.quarterLength /= 2
                     n = Note(intermediate_note)
+                    n.pitch.accidental.displayStatus = False
                     n.quarterLength = rhChord.quarterLength
-                    rightHand.append(rhChord)
                     rightHand.append(n)
-                else:
-                    rightHand.append(rhChord)
             rightHand.insert(0.0, clef.TrebleClef())
 
         else:  # Chorale-style output

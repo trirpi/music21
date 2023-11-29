@@ -61,8 +61,8 @@ class RuleSet:
             UpperPartsWithinLimit(cost=2*self.HIGH_COST),
             NotTooLow(cost=self.HIGH_COST),
             IsIncomplete(cost=self.HIGH_COST),
-            AvoidSeventhChord(cost=self.LOW_COST),
-            UseLeastAmountOfNotes(cost=self.LOW_COST),
+            # AvoidSeventhChord(cost=self.LOW_COST),
+            UseLeastAmountOfNotes(cost=self.LOW_COST, dynamic_ranges=self.DYNAMIC_RANGES),
             PitchesUnderMelody(cost=0.5 * self.LOW_COST),
         ]
 
@@ -517,10 +517,6 @@ class MinimizeMovementsSopranoVoice(TransitionRule):
         else:
             return math.floor(diff / 2) * self.cost
 
-    @staticmethod
-    def distance_between(part_a, part_b):
-        return abs(part_a - part_b)
-
 
 class PartMovementsWithinLimits(TransitionRule):
     def __init__(self, cost, limits):
@@ -889,8 +885,13 @@ class ContainRoot(SingleRule):
 
 
 class UseLeastAmountOfNotes(SingleRule):
-    def get_cost(self, possib, segment):
-        return max(0, (len(possib.integer_pitches) - 2)) * self.cost
+    def __init__(self, cost, dynamic_ranges):
+        super().__init__(cost)
+        self.dynamic_ranges = dynamic_ranges
+
+    def get_cost(self, possib, segment: 'Segment'):
+        min_voices = self.dynamic_ranges[segment.dynamic][0]
+        return max(0, (len(possib.integer_pitches) - min_voices)) * self.cost
 
 
 class NotesFromFigures(SingleRule):
