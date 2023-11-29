@@ -34,6 +34,11 @@ class RuleSet:
     MEDIUM_COST = 800
     LOW_COST = 400
 
+    # You can have at most #INTERMEDIATE_NOTES for each #INTERMEDIATE_COST consecutive segments
+    INTERMEDIATE_NOTES = 2
+    INTERMEDIATE_COST = 10
+    max_intermediate_allowance = INTERMEDIATE_NOTES * INTERMEDIATE_COST
+
     def __init__(self):
         self.transition_rules = [
             ParallelFifths(cost=2*self.HIGH_COST),

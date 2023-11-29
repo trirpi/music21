@@ -362,7 +362,8 @@ class Realization:
 
         dp: list[dict[int, dict[Possibility, int | float]]] = [  # (possibility, cost) dicts for each segment index i
             {
-                10: {possib: self.segment_list[0].get_cost(self.rule_set, possib) for possib in first_possibilities}
+                self.rule_set.max_intermediate_allowance:
+                    {possib: self.segment_list[0].get_cost(self.rule_set, possib) for possib in first_possibilities}
             }
         ]
 
@@ -371,7 +372,6 @@ class Realization:
             possibs_to = segment_b.all_filtered_possibilities(self.rule_set)
             dp_entry = defaultdict(lambda: defaultdict(lambda: float('inf')))
             for possib in tqdm(possibs_to, leave=False, desc=f"Segment {i + 1}/{len(self.segment_list)}"):
-                best_cost = float('inf')
                 for segment_a_idx in range(i, -1, -1):
                     num_skips = i - segment_a_idx
                     segment_a = self.segment_list[segment_a_idx]
@@ -385,15 +385,15 @@ class Realization:
                             transition_cost = self.rule_set.get_cost(prev_possib, segment_a, possib, segment_b)
                             new_cost = prev_cost + (num_skips+1)*(transition_cost + local_cost_b)
 
-                            avail = min(prev_avail+1, 10)
+                            avail = min(prev_avail + 1, self.rule_set.max_intermediate_allowance)
                             dp_entry[avail][possib] = min(dp_entry[avail][possib], new_cost)
-                            best_cost = min(new_cost, best_cost)
-                            if prev_avail >= 10:
+                            if prev_avail >= self.rule_set.INTERMEDIATE_COST:
                                 for intermediate_pitch, voice in segment_a.get_intermediate_int_pitches(prev_possib):
                                     transition_cost = self.rule_set.get_cost_with_intermediate(
                                         prev_possib, segment_a, possib, segment_b, intermediate_pitch, voice)
                                     new_cost = prev_cost + (num_skips + 1) * (transition_cost + local_cost_b)
-                                    dp_entry[0][possib] = min(dp_entry[0][possib], new_cost)
+                                    new_avail = prev_avail - self.rule_set.INTERMEDIATE_COST
+                                    dp_entry[new_avail][possib] = min(dp_entry[new_avail][possib], new_cost)
                     if skip_decision == SkipDecision.NO_SKIP:
                         break
 
@@ -435,7 +435,7 @@ class Realization:
                             i -= num_skips
                             found = True
                             break
-                        if prev_avail >= 10:
+                        if prev_avail >= self.rule_set.INTERMEDIATE_COST:
                             for intermediate_pitch, voice in segment_a.get_intermediate_int_pitches(possib_a):
                                 transition_cost = self.rule_set.get_cost_with_intermediate(
                                     possib_a, segment_a, best_possib, segment_b, intermediate_pitch, voice)
