@@ -28,6 +28,7 @@ import copy
 import logging
 import typing as t
 import unittest
+from collections import defaultdict
 
 from tqdm import tqdm
 
@@ -42,10 +43,10 @@ from music21.figuredBass import checker
 from music21.improvedFiguredBass import notation
 from music21.improvedFiguredBass import realizer_scale
 from music21.improvedFiguredBass import segment
+from music21.improvedFiguredBass.possibility import Possibility
 from music21.improvedFiguredBass.rules import RuleSet
 from music21.improvedFiguredBass.skip_rules import SkipDecision
 from music21.note import Note
-from music21.pitch import Pitch
 
 
 def figured_bass_from_stream(stream_part) -> FiguredBassLine:
@@ -359,14 +360,16 @@ class Realization:
     def generate_dp_table(self):
         first_possibilities = self.segment_list[0].all_filtered_possibilities(self.rule_set)
 
-        dp: list[dict] = [  # (possibility, cost) dicts for each segment index i
-            {possib: self.segment_list[0].get_cost(self.rule_set, possib) for possib in first_possibilities}
+        dp: list[dict[int, dict[Possibility, int | float]]] = [  # (possibility, cost) dicts for each segment index i
+            {
+                10: {possib: self.segment_list[0].get_cost(self.rule_set, possib) for possib in first_possibilities}
+            }
         ]
 
         for i in range(len(self.segment_list) - 1):
             segment_b = self.segment_list[i + 1]
             possibs_to = segment_b.all_filtered_possibilities(self.rule_set)
-            dp_entry = {}
+            dp_entry = defaultdict(lambda: defaultdict(lambda: float('inf')))
             for possib in tqdm(possibs_to, leave=False, desc=f"Segment {i + 1}/{len(self.segment_list)}"):
                 best_cost = float('inf')
                 for segment_a_idx in range(i, -1, -1):
@@ -375,31 +378,38 @@ class Realization:
                     skip_decision = self.rule_set.should_skip(segment_a)
                     if skip_decision == SkipDecision.SKIP:
                         continue
-                    for prev_possib, prev_cost in dp[segment_a_idx].items():
-                        local_cost_b = segment_b.get_cost(self.rule_set, possib)
+                    for prev_avail, possib_cost_dict in dp[segment_a_idx].items():
+                        for prev_possib, prev_cost in possib_cost_dict.items():
+                            local_cost_b = segment_b.get_cost(self.rule_set, possib)
 
-                        transition_cost = self.rule_set.get_cost(prev_possib, segment_a, possib, segment_b)
-                        new_cost = prev_cost + (num_skips+1)*(transition_cost + local_cost_b)
+                            transition_cost = self.rule_set.get_cost(prev_possib, segment_a, possib, segment_b)
+                            new_cost = prev_cost + (num_skips+1)*(transition_cost + local_cost_b)
 
-                        best_cost = min(new_cost, best_cost)
-                        for intermediate_pitch, voice in segment_a.get_intermediate_notes(prev_possib):
-                            transition_cost = self.rule_set.get_cost_with_intermediate(
-                                prev_possib, segment_a, possib, segment_b, intermediate_pitch, voice)
-                            new_cost = prev_cost + (num_skips + 1) * (transition_cost + local_cost_b)
+                            avail = min(prev_avail+1, 10)
+                            dp_entry[avail][possib] = min(dp_entry[avail][possib], new_cost)
                             best_cost = min(new_cost, best_cost)
+                            if prev_avail >= 10:
+                                for intermediate_pitch, voice in segment_a.get_intermediate_notes(prev_possib):
+                                    transition_cost = self.rule_set.get_cost_with_intermediate(
+                                        prev_possib, segment_a, possib, segment_b, intermediate_pitch, voice)
+                                    new_cost = prev_cost + (num_skips + 1) * (transition_cost + local_cost_b)
+                                    dp_entry[0][possib] = min(dp_entry[0][possib], new_cost)
                     if skip_decision == SkipDecision.NO_SKIP:
                         break
 
-                dp_entry[possib] = best_cost
             dp.append(dp_entry)
         return dp
 
     def get_reverse_choices(self, dp):
         # Extract best possib
         reverse_progression = []
-        d = dp[-1]
-        best_possib = min(d, key=d.get)
-        final_cost = min(d.values())
+        best_possib = None
+        final_cost = float('inf')
+        for _, d in dp[-1].items():
+            new_cost = min(d.values())
+            if new_cost < final_cost:
+                final_cost = new_cost
+                best_possib = min(d, key=d.get)
         best_cost = final_cost
         reverse_progression.append((best_possib, 0, None))
 
@@ -413,30 +423,35 @@ class Realization:
                 num_skips = i - segment_a_idx
                 segment_a = self.segment_list[segment_a_idx]
                 found = False
-                for possib_a, prev_cost in dp[segment_a_idx].items():
-                    to_possib_cost = segment_b.get_cost(self.rule_set, best_possib)
-                    transition_cost = self.rule_set.get_cost(possib_a, segment_a, best_possib, segment_b)
-                    if (num_skips+1) * (transition_cost + to_possib_cost) == best_cost - prev_cost:
-                        best_possib = possib_a
-                        best_cost = prev_cost
-                        reverse_progression.append((best_possib, num_skips, None))
-                        logging.log(logging.INFO, f"Chose {best_possib} after skipping {num_skips} notes.")
-                        i -= num_skips
-                        found = True
-                        break
-                    for intermediate_pitch, voice in segment_a.get_intermediate_notes(possib_a):
-                        transition_cost = self.rule_set.get_cost_with_intermediate(
-                            possib_a, segment_a, best_possib, segment_b, intermediate_pitch, voice)
+                for prev_avail, possib_cost_dict in dp[segment_a_idx].items():
+                    for possib_a, prev_cost in possib_cost_dict.items():
+                        to_possib_cost = segment_b.get_cost(self.rule_set, best_possib)
+                        transition_cost = self.rule_set.get_cost(possib_a, segment_a, best_possib, segment_b)
                         if (num_skips+1) * (transition_cost + to_possib_cost) == best_cost - prev_cost:
                             best_possib = possib_a
                             best_cost = prev_cost
-                            reverse_progression.append((best_possib, num_skips, intermediate_pitch))
-                            logging.log(logging.INFO, f"Chose {best_possib} after skipping {num_skips} notes"
-                                                      f"with intermediate note {intermediate_pitch}.")
+                            reverse_progression.append((best_possib, num_skips, None))
+                            logging.log(logging.INFO, f"Chose {best_possib} after skipping {num_skips} notes.")
                             i -= num_skips
                             found = True
                             break
-
+                        if prev_avail >= 10:
+                            for intermediate_pitch, voice in segment_a.get_intermediate_notes(possib_a):
+                                transition_cost = self.rule_set.get_cost_with_intermediate(
+                                    possib_a, segment_a, best_possib, segment_b, intermediate_pitch, voice)
+                                if (num_skips+1) * (transition_cost + to_possib_cost) == best_cost - prev_cost:
+                                    best_possib = possib_a
+                                    best_cost = prev_cost
+                                    reverse_progression.append((best_possib, num_skips, intermediate_pitch))
+                                    logging.log(logging.INFO, f"Chose {best_possib} after skipping {num_skips} notes"
+                                                              f"with intermediate note {intermediate_pitch}.")
+                                    i -= num_skips
+                                    found = True
+                                    break
+                            if found:
+                                break
+                    if found:
+                        break
                 if found:
                     break
             i -= 1
