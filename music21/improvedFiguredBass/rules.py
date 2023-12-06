@@ -62,8 +62,9 @@ class RuleSet:
             IsPlayable(cost=float('inf')),
             PitchesWithinLimit(cost=float('inf')),
             OnlyAllowSixOptionAfterCadence(cost=float('inf')),
-            DoubleRootIfCadence(cost=3*self.HIGH_COST),
+            DoubleRootIfCadence(cost=2*self.HIGH_COST),
             UpperPartsWithinLimit(cost=2*self.HIGH_COST),
+            AvoidDoubling(cost=self.HIGH_COST),
             NotTooLow(cost=self.HIGH_COST),
             IsIncomplete(cost=self.HIGH_COST),
             # AvoidSeventhChord(cost=self.LOW_COST),
@@ -911,7 +912,7 @@ class NotesFromFigures(SingleRule):
 
 class DoubleRootIfCadence(SingleRule):
     def get_cost(self, possib, segment):
-        if segment.ends_cadence:
+        if segment.ends_cadence and segment.duration.quarterLength >= 2:
             root_pitch = possib.integer_pitches[-1]
             for pitch in possib.integer_pitches[:-1]:
                 if pitch - root_pitch % 12 == 0:
@@ -944,6 +945,14 @@ class OnlyAllowSixOptionAfterCadence(SingleRule):
                 return 0
 
         return 0
+
+
+class AvoidDoubling(SingleRule):
+    def get_cost(self, possib: 'Possibility', segment: 'Segment'):
+        segment_option = possib.get_segment_option(segment)
+        num_pitches_possible = min(len(segment_option.pitch_names_in_chord), len(possib.integer_pitches))
+        different_pitches = len(set(p % 12 for p in possib.integer_pitches))
+        return max(num_pitches_possible - different_pitches, 0) * self.cost
 
 
 def partPairs(possibA, possibB):
