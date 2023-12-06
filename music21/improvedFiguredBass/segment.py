@@ -84,6 +84,7 @@ class Segment:
         self.on_beat = None
         self.melody_pitches = set()
         self.start_offset = 0
+        self.ends_cadence = False
 
         self.play_offsets = play_offsets
         self.notation_strings = [notationString]
@@ -101,15 +102,6 @@ class Segment:
     @property
     def duration(self):
         return self.bassNote.duration
-
-    @property
-    def ends_cadence(self):
-        return (
-            self.notation_strings[0] is None and
-            self.prev_segment and (
-                int(self.prev_segment.bassNote.pitch.ps) % 12 == (self.bassNote.pitch.ps + 7) % 12
-            )
-        )
 
     def set_pitch_names_in_chord(self):
         for option in self.segment_options:
