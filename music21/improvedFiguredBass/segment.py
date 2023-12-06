@@ -103,6 +103,10 @@ class Segment:
     def duration(self):
         return self.bassNote.duration
 
+    @property
+    def quarterLength(self):
+        return self.duration.quarterLength
+
     def set_pitch_names_in_chord(self):
         for option in self.segment_options:
             option.set_pitch_names_in_chord()

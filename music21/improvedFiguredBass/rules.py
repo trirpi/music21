@@ -47,8 +47,8 @@ class RuleSet:
             HiddenOctave(cost=self.LOW_COST),
             VoiceOverlap(cost=self.HIGH_COST),
             # UpperPartsSame(cost=self.lowPriorityRuleCost),
-            MinimizeMovementsMiddleVoices(cost=self.LOW_COST),
-            MinimizeMovementsSopranoVoice(cost=self.HIGH_COST),
+            MinimizeMovementsMiddleVoices(cost=0.5*self.LOW_COST),
+            MinimizeMovementsSopranoVoice(cost=self.MEDIUM_COST),
             UnpreparedNote(cost=self.LOW_COST),
             CounterMovement(cost=self.MEDIUM_COST)
         ]
@@ -62,13 +62,13 @@ class RuleSet:
             IsPlayable(cost=float('inf')),
             PitchesWithinLimit(cost=float('inf')),
             OnlyAllowSixOptionAfterCadence(cost=float('inf')),
-            DoubleRootIfCadence(cost=2*self.HIGH_COST),
-            UpperPartsWithinLimit(cost=2*self.HIGH_COST),
-            AvoidDoubling(cost=self.HIGH_COST),
-            NotTooLow(cost=self.HIGH_COST),
-            IsIncomplete(cost=self.HIGH_COST),
+            DoubleRootIfCadence(cost=self.HIGH_COST),
+            UpperPartsWithinLimit(cost=self.HIGH_COST),
+            AvoidDoubling(cost=self.MEDIUM_COST),
+            IsIncomplete(cost=self.MEDIUM_COST),
+            NotTooLow(cost=self.MEDIUM_COST),
             # AvoidSeventhChord(cost=self.LOW_COST),
-            UseLeastAmountOfNotes(cost=self.LOW_COST, dynamic_ranges=self.DYNAMIC_RANGES),
+            UseLeastAmountOfNotes(cost=self.MEDIUM_COST, dynamic_ranges=self.DYNAMIC_RANGES),
             PitchesUnderMelody(cost=0.5 * self.LOW_COST),
         ]
 

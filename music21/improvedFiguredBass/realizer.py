@@ -239,8 +239,6 @@ class FiguredBassLine:
         '''
         generates the segmentList from an fbList, including any overlaid Segments
 
-        if fbRules is None, creates a new rules.Rules() object
-
         if maxPitch is None, uses pitch.Pitch('B5')
         '''
         if max_pitch is None:
@@ -252,36 +250,16 @@ class FiguredBassLine:
             currentMapping = checker.extractHarmonies(self._overlaidParts)
         else:
             currentMapping = checker.createOffsetMapping(bassLine)
-        allKeys = sorted(currentMapping.keys())
-        bassLine = bassLine.flatten().notes
-        bassNoteIndex = 0
-        previousBassNote = bassLine[bassNoteIndex]
-        bassNote = currentMapping[allKeys[0]][-1]
-        play_offsets = allKeys[0]
-        previousSegment = segment.Segment(bassNote, bassNote.editorial.notationString,
-                                          self._fbScale,
-                                          max_pitch, play_offsets=play_offsets)
-        previousSegment.quarterLength = previousBassNote.quarterLength
-        segmentList.append(previousSegment)
-        for k in allKeys[1:]:
-            (startTime, unused_endTime) = k
-            bassNote = currentMapping[k][-1]
-            currentSegment = segment.Segment(bassNote, bassNote.editorial.notationString,
+
+        offsets = [
+            [n.offset, n.offset + n.quarterLength]
+            for n in bassLine.flatten().notes
+        ]
+        for bass_note, play_offset in zip(bassLine.notes, offsets):
+            currentSegment = segment.Segment(bass_note, bass_note.editorial.notationString,
                                              self._fbScale,
-                                             max_pitch, play_offsets=k)
-            for partNumber in range(1, len(currentMapping[k])):
-                upperPitch = currentMapping[k][partNumber - 1]
-                currentSegment.rules_config._partPitchLimits.append((partNumber, upperPitch))
-            if startTime == previousBassNote.offset + previousBassNote.quarterLength:
-                bassNoteIndex += 1
-                previousBassNote = bassLine[bassNoteIndex]
-                currentSegment.quarterLength = previousBassNote.quarterLength
-            else:
-                # Fictitious, representative only for harmonies preserved
-                # with addition of melody or melodies
-                currentSegment.quarterLength = 0.0
+                                             max_pitch, play_offsets=play_offset)
             segmentList.append(currentSegment)
-            previousSegment = currentSegment
         return segmentList
 
     # noinspection PyUnreachableCode
