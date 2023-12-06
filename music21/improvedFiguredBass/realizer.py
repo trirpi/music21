@@ -465,7 +465,7 @@ class Realization:
             self.rule_set.get_cost(val, curr_segment, enable_logging=True)
             result.append(val)
             for i in range(curr_idx+1, curr_idx+1+num_skips):
-                self.segment_list[curr_idx].quarterLength += self.segment_list[i].quarterLength
+                self.segment_list[curr_idx].duration.quarterLength += self.segment_list[i].quarterLength
                 idx_to_delete.append(i)
             curr_idx += 1 + num_skips
             prev_segment = curr_segment
