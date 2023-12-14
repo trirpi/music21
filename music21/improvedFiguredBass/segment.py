@@ -83,6 +83,7 @@ class Segment:
         self.dynamic = dynamic
         self.on_beat = None
         self.melody_pitches = set()
+        self.melody_pitches_at_strike = set()
         self.start_offset = 0
         self.ends_cadence = False
 

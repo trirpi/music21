@@ -753,7 +753,11 @@ class HasDuplicate(SingleRule):
 class IsIncomplete(SingleRule):
     def get_cost(self, possib, segment):
         segment_option = possib.get_segment_option(segment)
-        if not self.isIncomplete(possib.get_pitches(), segment_option.pitch_names_in_chord.copy(), segment.melody_pitches):
+        if not self.isIncomplete(
+            possib.get_pitches(),
+            segment_option.pitch_names_in_chord.copy(),
+            segment.melody_pitches_at_strike
+        ):
             return 0
         return self.cost
 
