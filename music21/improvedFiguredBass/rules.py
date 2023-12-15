@@ -823,7 +823,11 @@ class UpperPartsWithinLimit(SingleRule):
 
 class PitchesUnderMelody(SingleRule):
     def get_cost(self, possib, segment):
-        return max(0, self.cost * (possib.integer_pitches[0] - min([pitch.ps for pitch in segment.melody_pitches])))
+        if len(segment.melody_pitches) == 0:
+            return 0
+
+        smallest_melody_pitch = min([pitch.ps for pitch in segment.melody_pitches])
+        return max(0, self.cost * (possib.integer_pitches[0] - smallest_melody_pitch))
 
 
 class PitchesWithinLimit(SingleRule):
