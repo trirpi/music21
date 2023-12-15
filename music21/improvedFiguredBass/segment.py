@@ -22,6 +22,7 @@ from music21.improvedFiguredBass import realizer_scale
 from music21.improvedFiguredBass import resolution
 from music21.improvedFiguredBass.possibility import Possibility
 from music21.improvedFiguredBass.rules import RuleSet
+from music21.pitch import Pitch
 
 
 class Segment:
@@ -116,14 +117,23 @@ class Segment:
         for option in self.segment_options:
             option.update_pitch_names_in_chord(past_measure)
 
+    def no_melody_pitch_within_semitone(self, pitch: int):
+        return (
+            Pitch(pitch + 1) not in self.melody_pitches and
+            Pitch(pitch - 1) not in self.melody_pitches
+        )
+
     def get_intermediate_int_pitches(self, possib: 'Possibility'):
         """Given a possibility returns list pairs of intermediate note pitch and voice."""
         result = []
         for voice, int_pitch in enumerate(possib.integer_pitches[:-1]):
             pitch_above = int_pitch+1 if (int_pitch+1) % 12 in self.scale_pitch_classes else int_pitch+2
-            result.append((pitch_above, voice))
+            if self.no_melody_pitch_within_semitone(pitch_above):
+                result.append((pitch_above, voice))
+
             pitch_below = int_pitch-1 if (int_pitch-1) % 12 in self.scale_pitch_classes else int_pitch-2
-            result.append((pitch_below, voice))
+            if self.no_melody_pitch_within_semitone(pitch_below):
+                result.append((pitch_below, voice))
         return result
 
     def resolveDominantSeventhSegment(self, segmentB):
