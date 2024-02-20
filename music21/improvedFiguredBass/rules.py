@@ -34,7 +34,7 @@ class RuleSet:
     MEDIUM_COST = 800
     LOW_COST = 400
 
-    INCREASE_ALLOWANCE_INTERVAL = 20
+    INCREASE_ALLOWANCE_INTERVAL = 40
     MAX_ALLOWANCE = 1
 
     def __init__(self):

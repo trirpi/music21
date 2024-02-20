@@ -363,8 +363,8 @@ class Realization:
                             transition_cost = self.rule_set.get_cost(prev_possib, segment_a, possib, segment_b)
                             new_cost = prev_cost + (num_skips+1)*(transition_cost + local_cost_b)
 
-                            increase_allowance = i == self.rule_set.INCREASE_ALLOWANCE_INTERVAL
-                            avail = max(prev_avail + increase_allowance, self.rule_set.MAX_ALLOWANCE)
+                            increase_allowance = (i == self.rule_set.INCREASE_ALLOWANCE_INTERVAL)
+                            avail = min(prev_avail + increase_allowance, self.rule_set.MAX_ALLOWANCE)
                             dp_entry[avail][possib] = min(dp_entry[avail][possib], new_cost)
                             if prev_avail >= 1:
                                 for intermediate_pitch, voice in segment_a.get_intermediate_int_pitches(prev_possib):
