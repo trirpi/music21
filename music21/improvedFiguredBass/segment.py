@@ -123,18 +123,27 @@ class Segment:
             Pitch(pitch - 1) not in self.melody_pitches
         )
 
-    def get_intermediate_int_pitches(self, possib: 'Possibility'):
+    def get_intermediate_int_pitches(self, possib: 'Possibility', next_possib: 'Possibility'):
         """Given a possibility returns list pairs of intermediate note pitch and voice."""
         result = []
         for voice, int_pitch in enumerate(possib.integer_pitches[:-1]):
             pitch_above = int_pitch+1 if (int_pitch+1) % 12 in self.scale_pitch_classes else int_pitch+2
-            if self.no_melody_pitch_within_semitone(pitch_above):
-                result.append((pitch_above, voice))
+            result.append((pitch_above, voice))
+            pitch_above = int_pitch+3 if (int_pitch+3) % 12 in self.scale_pitch_classes else int_pitch+4
+            result.append((pitch_above, voice))
 
             pitch_below = int_pitch-1 if (int_pitch-1) % 12 in self.scale_pitch_classes else int_pitch-2
-            if self.no_melody_pitch_within_semitone(pitch_below):
-                result.append((pitch_below, voice))
-        return result
+            result.append((pitch_below, voice))
+            pitch_below = int_pitch-3 if (int_pitch-3) % 12 in self.scale_pitch_classes else int_pitch-4
+            result.append((pitch_below, voice))
+
+        def check(tup):
+            p = tup[0]
+            return (self.no_melody_pitch_within_semitone(pitch_below) and
+                    p not in possib.integer_pitches and
+                    p not in next_possib.integer_pitches)
+
+        return filter(check, result)
 
     def resolveDominantSeventhSegment(self, segmentB):
         # noinspection PyShadowingNames
