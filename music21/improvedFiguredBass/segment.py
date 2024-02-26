@@ -141,7 +141,11 @@ class Segment:
             p = tup[0]
             return (self.no_melody_pitch_within_semitone(pitch_below) and
                     p not in possib.integer_pitches and
-                    p not in next_possib.integer_pitches)
+                    p-1 not in possib.integer_pitches and
+                    p+1 not in possib.integer_pitches and
+                    p not in next_possib.integer_pitches and
+                    p-1 not in next_possib.integer_pitches and
+                    p+1 not in next_possib.integer_pitches)
 
         return filter(check, result)
 
