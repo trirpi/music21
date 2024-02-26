@@ -19,5 +19,11 @@ class Possibility:
     def __repr__(self):
         return '(' + ' '.join(p.nameWithOctave.ljust(3) for p in reversed(self.get_pitches())) + ')'
 
+    def __eq__(self, other) -> bool:
+        return self.integer_pitches == other.integer_pitches
+
+    def __hash__(self) -> int:
+        return self.integer_pitches.__hash__()
+
     def get_segment_option(self, segment: 'Segment'):
         return segment.segment_options[self.option_index]
