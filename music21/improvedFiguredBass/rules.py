@@ -39,16 +39,17 @@ class RuleSet:
 
     def __init__(self):
         self.transition_rules = [
-            ParallelFifths(cost=2*self.HIGH_COST),
-            ParallelOctaves(cost=2*self.HIGH_COST),
+            ParallelFifths(cost=2 * self.HIGH_COST),
+            ParallelOctaves(cost=2 * self.HIGH_COST),
             HiddenFifth(cost=self.LOW_COST),
             HiddenOctave(cost=self.LOW_COST),
             VoiceOverlap(cost=self.HIGH_COST),
             # UpperPartsSame(cost=self.lowPriorityRuleCost),
-            MinimizeMovementsMiddleVoices(cost=0.5*self.LOW_COST),
+            MinimizeMovementsMiddleVoices(cost=0.5 * self.LOW_COST),
             MinimizeMovementsSopranoVoice(cost=self.MEDIUM_COST),
             UnpreparedNote(cost=self.LOW_COST),
-            CounterMovement(cost=self.MEDIUM_COST)
+            CounterMovement(cost=self.MEDIUM_COST),
+            ResolveRootCadenceUp(cost=2*self.HIGH_COST)
         ]
 
         self.single_rules = [
@@ -59,15 +60,15 @@ class RuleSet:
             NoSmallSecondInterval(cost=float('inf')),
             IsPlayable(cost=float('inf')),
             PitchesWithinLimit(cost=float('inf')),
-            OnlyAllowSixOptionAfterCadence(cost=float('inf')),
-            DoubleRootIfCadence(cost=self.HIGH_COST),
+            OnlyAllowSixthHalfNoteUnderRoot(cost=float('inf')),
+            DoubleRootIfCadence(cost=5*self.HIGH_COST),
             UpperPartsWithinLimit(cost=self.HIGH_COST),
-            AvoidDoubling(cost=self.MEDIUM_COST),
+            AvoidDoubling(cost=self.HIGH_COST),
             IsIncomplete(cost=self.MEDIUM_COST),
             NotTooLow(cost=self.MEDIUM_COST),
             # AvoidSeventhChord(cost=self.LOW_COST),
-            UseLeastAmountOfNotes(cost=self.MEDIUM_COST, dynamic_ranges=self.DYNAMIC_RANGES),
-            PitchesUnderMelody(cost=0.5 * self.LOW_COST),
+            UseLeastAmountOfNotes(cost=self.LOW_COST, dynamic_ranges=self.DYNAMIC_RANGES),
+            PitchesUnderMelody(cost=0.09 * self.LOW_COST),
         ]
 
         self.skip_rules = SkipRules()
@@ -97,7 +98,10 @@ class RuleSet:
         total_cost = 0
         for rule in rules:
             if possib_b is not None:
-                cost = rule.get_int_cost(possib_a, possib_b, segment_a, segment_b)
+                if segment_a.bassNote.pitch == segment_b.bassNote.pitch and possib_a == possib_b:
+                    cost = 0
+                else:
+                    cost = rule.get_int_cost(possib_a, possib_b, segment_a, segment_b)
             else:
                 cost = rule.get_int_cost(possib_a, segment_a)
             if enable_logging and cost != 0:
@@ -212,7 +216,8 @@ class ParallelFifths(TransitionRule):
             for pair2Index in range(pair1Index + 1, len(pairs_list)):
                 (lowerPitchA, lowerPitchB) = pairs_list[pair2Index]
                 if abs(higherPitchA - lowerPitchA) % 12 == 7 and abs(higherPitchB - lowerPitchB) % 12 == 7:
-                    return True
+                    if higherPitchA != higherPitchB:
+                        return True
 
         return False
 
@@ -282,7 +287,8 @@ class ParallelOctaves(TransitionRule):
             for pair2Index in range(pair1Index + 1, len(pairsList)):
                 (lowerPitchA, lowerPitchB) = pairsList[pair2Index]
                 if abs(higherPitchA - lowerPitchA) % 12 == 0 and abs(higherPitchB - lowerPitchB) % 12 == 0:
-                    return True
+                    if higherPitchA != higherPitchB:
+                        return True
         return False
 
 
@@ -684,6 +690,20 @@ class CounterMovement(TransitionRule):
         return self.cost
 
 
+class ResolveRootCadenceUp(TransitionRule):
+    """Check if note is long and double root in soprano."""
+
+    def get_cost(self, possib_a, possib, segment_a, segment):
+        if segment.ends_cadence and segment.duration.quarterLength >= 2:
+            root_pitch = possib.integer_pitches[-1]
+            sop_pitch = possib.integer_pitches[0]
+            if (sop_pitch - root_pitch) % 12 == 0:
+                if 0 < (sop_pitch - possib_a.integer_pitches[0]) <= 2:
+                    return 0
+                else:
+                    return self.cost
+        return 0
+
 class SingleRule(Rule):
     @abstractmethod
     def get_cost(self, possib, segment):
@@ -824,7 +844,8 @@ class PitchesUnderMelody(SingleRule):
         if len(segment.melody_pitches) == 0:
             return 0
 
-        smallest_melody_pitch = min([pitch.ps for pitch in segment.melody_pitches])
+        # smallest_melody_pitch = min([pitch.ps for pitch in segment.melody_pitches])
+        smallest_melody_pitch = Pitch('C4').ps
         return max(0, self.cost * (possib.integer_pitches[0] - smallest_melody_pitch))
 
 
@@ -913,38 +934,29 @@ class NotesFromFigures(SingleRule):
 
 
 class DoubleRootIfCadence(SingleRule):
+    """Check if note is long and double root in soprano."""
+
     def get_cost(self, possib, segment):
         if segment.ends_cadence and segment.duration.quarterLength >= 2:
             root_pitch = possib.integer_pitches[-1]
-            for pitch in possib.integer_pitches[:-1]:
-                if pitch - root_pitch % 12 == 0:
-                    return 0
+            if (possib.integer_pitches[0] - root_pitch) % 12 == 0:
+                return 0
             return self.cost
         return 0
 
 
-class OnlyAllowSixOptionAfterCadence(SingleRule):
+class OnlyAllowSixthHalfNoteUnderRoot(SingleRule):
     def get_cost(self, possib: Possibility, segment):
         if segment.prev_segment is None:
             return 0
-        if segment.notation_strings[0] is None and possib.option_index != 0:
-            if segment.prev_segment.ends_cadence:
-                jump_down = segment.bassNote.pitch.ps - segment.prev_segment.bassNote.pitch.ps
-                if jump_down != 1:
-                    return self.cost
-                else:
-                    return 0
-            else:
+        if (
+            (segment.prev_segment.bassNote.pitch.ps % 12 == segment.prev_segment.bassNote.key_pitch_class) and
+            (segment.bassNote.pitch.ps - segment.prev_segment.bassNote.pitch.ps) == -1
+        ):
+            if segment.notation_strings[0] is None and possib.option_index == 0:
                 return self.cost
-        elif segment.notation_strings[0] is None and possib.option_index == 0:
-            if segment.prev_segment.ends_cadence:
-                jump_down = segment.bassNote.pitch.ps - segment.prev_segment.bassNote.pitch.ps
-                if jump_down == 1:
-                    return self.cost
-                else:
-                    return 0
-            else:
-                return 0
+        elif segment.notation_strings[0] is None and possib.option_index == 1:
+            return self.cost
 
         return 0
 
