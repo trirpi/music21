@@ -494,7 +494,8 @@ class Realization:
             for segmentIndex in range(len(self.segment_list)):
                 possibA = possibility_progression[segmentIndex].get_pitches()
                 for p in possibA:
-                    p.accidental.displayStatus = False
+                    if p.accidental is not None:
+                        p.accidental.displayStatus = False
                 bassNote = copy.deepcopy(self.segment_list[segmentIndex].bassNote)
                 bassLine.append(bassNote)
                 rhPitches = possibA[0:-1]
