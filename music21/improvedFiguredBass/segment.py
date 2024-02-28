@@ -89,9 +89,12 @@ class Segment:
         self.ends_cadence = False
 
         self.play_offsets = play_offsets
-        self.notation_strings = [notationString]
-        if self.notation_strings[0] is None:
-            self.notation_strings.append('6')
+        if notationString is None:
+            self.notation_strings = ['3', '6']
+        elif not (last := notationString.split(",")[-1])[0].isdigit():
+            self.notation_strings = ['3' + last]
+        else:
+            self.notation_strings = [notationString]
 
         self.segment_options = [SegmentOption(self, n, i) for i, n in enumerate(self.notation_strings)]
 
