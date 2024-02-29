@@ -24,7 +24,7 @@ class SkipRules:
 
     def should_skip(self, segment: 'Segment') -> SkipDecision:
         if (
-            segment.notation_strings[0]
+            segment.actual_notation_string
             or segment.duration.quarterLength >= 1
             or segment.prev_segment is None
             or segment.prev_segment.duration.quarterLength < segment.duration.quarterLength

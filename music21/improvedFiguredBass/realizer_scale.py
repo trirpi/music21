@@ -150,7 +150,7 @@ class FiguredBassScale:
             pitchSD = (bassSD + number - 1) % 7
             samplePitch = self.realizerScale.pitchFromDegree(pitchSD)
             pitchNames.add(samplePitch.name)
-            if modifier is not None:
+            if modifier:
                 self.modify[samplePitch.name] = Modifier(modifier)
 
         return pitchNames

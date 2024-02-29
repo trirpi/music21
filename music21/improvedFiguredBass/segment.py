@@ -89,10 +89,11 @@ class Segment:
         self.ends_cadence = False
 
         self.play_offsets = play_offsets
+        self.actual_notation_string = notationString
         if notationString is None:
             self.notation_strings = ['3', '6']
-        elif not (last := notationString.split(",")[-1])[0].isdigit():
-            self.notation_strings = ['3' + last]
+        elif not (last := notationString.split(",")[-1])[-1].isdigit():
+            self.notation_strings = [notationString + '3']
         else:
             self.notation_strings = [notationString]
 
